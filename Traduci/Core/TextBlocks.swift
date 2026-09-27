@@ -51,7 +51,10 @@ enum TextBlockBuilder {
     static func continues(_ line: OCRLine, _ next: OCRLine) -> Bool {
         let a = line.box, b = next.box
         let small = min(a.height, b.height), large = max(a.height, b.height)
-        guard small > 0, large <= small * 1.6 else { return false }
+        // All-caps lines have no ascenders or descenders, so their heights compare font sizes
+        // directly: a big heading and the smaller subtitle under it stay separate.
+        let bothCaps = TextNormalizer.isAllCaps(line.text) && TextNormalizer.isAllCaps(next.text)
+        guard small > 0, large <= small * (bothCaps ? 1.2 : 1.6) else { return false }
         let gap = b.minY - a.maxY
         guard gap > -0.5 * small, gap < small else { return false }
         let overlap = min(a.maxX, b.maxX) - max(a.minX, b.minX)
@@ -91,10 +94,7 @@ enum TextNormalizer {
 
     /// Signs are often ALL CAPS, which translation models handle badly. Feed them sentence case.
     static func translationInput(_ text: String) -> String {
-        let letters = text.filter { $0.isLetter }
-        guard letters.count >= 4 else { return text }
-        let uppercase = letters.filter { $0.isUppercase }.count
-        guard uppercase * 5 >= letters.count * 4 else { return text }
+        guard text.filter({ $0.isLetter }).count >= 4, isAllCaps(text) else { return text }
         let lower = text.lowercased()
         guard let first = lower.firstIndex(where: { $0.isLetter }) else { return lower }
         return String(lower[..<first]) + lower[first].uppercased() + lower[lower.index(after: first)...]
@@ -105,9 +105,45 @@ enum TextNormalizer {
         folded(a) == folded(b)
     }
 
+    static func isAllCaps(_ text: String) -> Bool {
+        let letters = text.filter { $0.isLetter }
+        return letters.count >= 2 && letters.filter { $0.isUppercase }.count * 5 >= letters.count * 4
+    }
+
+    /// "• …", "- …", "1. …", "2) …": always the start of a new item, whatever the line above says.
+    static func startsListItem(_ text: String) -> Bool {
+        guard let first = text.first else { return false }
+        if "•·▪●○◦‣⁃-–—*".contains(first) { return true }
+        let digits = text.prefix { $0.isNumber }
+        guard (1...2).contains(digits.count) else { return false }
+        let marker = text.dropFirst(digits.count).first
+        return marker == "." || marker == ")"
+    }
+
+    /// How alike two OCR readings are, 0...1 (Dice overlap of letter pairs), ignoring case,
+    /// accents, spaces and punctuation. "Usclta di sicurezza" vs "Uscita di sicurezza" ≈ 0.88.
+    static func similarity(_ a: String, _ b: String) -> Double {
+        let x = Array(folded(a)), y = Array(folded(b))
+        guard x.count > 1, y.count > 1 else { return x == y ? 1 : 0 }
+        var pairs: [String: Int] = [:]
+        for index in 0..<(x.count - 1) {
+            pairs[String([x[index], x[index + 1]]), default: 0] += 1
+        }
+        var shared = 0
+        for index in 0..<(y.count - 1) {
+            let pair = String([y[index], y[index + 1]])
+            if let count = pairs[pair], count > 0 {
+                pairs[pair] = count - 1
+                shared += 1
+            }
+        }
+        return Double(2 * shared) / Double(x.count + y.count - 2)
+    }
+
     static func readsAsContinuation(_ line: String, _ next: String) -> Bool {
         guard let lastCharacter = line.last,
               let firstLetter = next.first(where: { $0.isLetter }) else { return false }
+        if startsListItem(next) { return false }
         if lastCharacter == "-" || lastCharacter == "," { return true }
         if firstLetter.isLowercase { return true }
         if let last = words(line).last, trailingJoiners.contains(last) { return true }

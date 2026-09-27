@@ -102,6 +102,78 @@ do {
     expect(!TextNormalizer.isWorthTranslating("Tel. 055 123456"), "phone numbers are skipped")
 }
 
+// MARK: TestFlight feedback: dense text
+
+do {
+    // Hotel fire notice: bullets were merged into one blob because a line ended in "non".
+    let bullets = texts([
+        line("• Uscire dalla camera chiudendo la porta, ma non", 0.1, 0.100, 0.7),
+        line("• Avvisare immediatamente il personale di servizio", 0.1, 0.125, 0.7),
+        line("• Non ostruire le uscite con", 0.1, 0.150, 0.5),
+        line("bagagli o altri oggetti.", 0.1, 0.175, 0.4),
+        line("1. Mantenere la calma", 0.1, 0.200, 0.4),
+        line("2. Uscire dalla camera", 0.1, 0.225, 0.4),
+    ])
+    expect(bullets == ["• Uscire dalla camera chiudendo la porta, ma non", "• Avvisare immediatamente il personale di servizio",
+                       "• Non ostruire le uscite con bagagli o altri oggetti.", "1. Mantenere la calma", "2. Uscire dalla camera"],
+           "each bullet is its own block; a bullet's wrapped line still joins it: \(bullets)")
+
+    // Big red heading over a smaller subtitle that starts with "IN": keep them apart.
+    let headings = texts([
+        line("COSA FARE IN CASO DI INCENDIO", 0.1, 0.30, 0.6, 0.030),
+        line("IN CASO DI INCENDIO NELLA VOSTRA CAMERA", 0.1, 0.335, 0.6, 0.022),
+    ])
+    expect(headings.count == 2, "heading and subtitle stay separate: \(headings)")
+    expect(TextNormalizer.startsListItem("10) Chiamare il 112") && !TextNormalizer.startsListItem("1300 anni fa")
+           && !TextNormalizer.startsListItem("2,50 €"), "list markers are recognised, numbers aren't")
+}
+
+// MARK: TestFlight feedback: nervous overlays
+
+do {
+    expect(TextNormalizer.similarity("Uscita di sicurezza", "Usclta di sicurezza") > 0.8, "a one-letter misread is still the same text")
+    expect(TextNormalizer.similarity("Uscita", "Ingresso") < 0.3, "different words aren't")
+
+    var tracker = OverlayTracker()
+    let towel = TextBlock(text: "Si prega di lasciare gli asciugamani", box: CGRect(x: 0.1, y: 0.4, width: 0.8, height: 0.02), lineCount: 1)
+    let english = ["Si prega di lasciare gli asciugamani": "Please leave the towels"]
+    tracker.update(with: [towel], at: 1.0, translations: english)
+
+    // Hand shake: a few points of drift in both directions never moves the overlay.
+    for (step, (dx, dy)) in [(0.006, 0.004), (-0.005, -0.006), (0.004, 0.007)].enumerated() {
+        var shaken = towel
+        shaken.box = shaken.box.offsetBy(dx: dx, dy: dy)
+        tracker.update(with: [shaken], at: 1.1 + Double(step) / 10, translations: english)
+        expect(tracker.items[0].box == towel.box, "shake \(step) leaves the overlay still")
+    }
+    var resized = towel
+    resized.box.size.width = 0.6
+    tracker.update(with: [resized], at: 1.5, translations: english)
+    expect(tracker.items[0].box == resized.box, "a real size change is followed")
+
+    // A misread that flickers in for a frame or two never replaces the text or its translation.
+    var misread = resized
+    misread.text = "Si prega di lasclare gli asciugamani"
+    for time in [1.6, 1.7] {
+        tracker.update(with: [misread], at: time, translations: english)
+        expect(tracker.items[0].source == towel.text && tracker.items[0].translation == "Please leave the towels",
+               "a flickering misread is ignored")
+    }
+    tracker.update(with: [resized], at: 1.8, translations: english)
+    tracker.update(with: [misread], at: 1.9, translations: english)
+    tracker.update(with: [misread], at: 2.0, translations: english)
+    expect(tracker.items[0].source == towel.text, "the misread streak restarted when the good reading came back")
+    tracker.update(with: [misread], at: 2.1, translations: english)
+    expect(tracker.items[0].source == misread.text && tracker.items[0].translation == "Please leave the towels"
+           && !tracker.items[0].translationIsCurrent, "a reading that holds for three frames is adopted; old English stays up meanwhile")
+
+    // Completely different text in the same spot switches at once and never wears the old English.
+    var other = resized
+    other.text = "Colazione dalle 7 alle 10"
+    tracker.update(with: [other], at: 2.2, translations: english)
+    expect(tracker.items[0].source == other.text && tracker.items[0].translation == nil, "different text: no stale translation")
+}
+
 // MARK: Overlay tracking
 
 do {
@@ -119,7 +191,7 @@ do {
     jittered.box.origin.x += 0.004
     tracker.update(with: [jittered], at: 1.1, translations: ["Uscita": "Exit"])
     expect(tracker.items.count == 1 && tracker.items[0].id == id, "jittered text keeps its overlay")
-    expect(approx(tracker.items[0].box.minX, 0.402), "jitter is damped: \(tracker.items[0].box)")
+    expect(tracker.items[0].box == exit.box, "hand shake doesn't move the overlay: \(tracker.items[0].box)")
 
     var moved = exit
     moved.box.origin.y += 0.03
@@ -129,9 +201,9 @@ do {
     var misread = moved
     misread.text = "Uscita."
     tracker.update(with: [misread], at: 1.2, translations: ["Uscita": "Exit"])
-    expect(tracker.items[0].translation == "Exit" && !tracker.items[0].translationIsCurrent,
-           "old translation stays up while the new reading is translated")
-    expect(tracker.sourcesByPriority(seenAt: 1.2) == ["Uscita."], "new reading is queued")
+    expect(tracker.items[0].source == "Uscita" && tracker.items[0].translationIsCurrent,
+           "a punctuation-only misread changes nothing")
+    expect(tracker.sourcesByPriority(seenAt: 1.2) == ["Uscita"], "and nothing new is queued")
 
     tracker.update(with: [], at: 1.3, translations: [:])
     expect(tracker.items.count == 1, "a one-frame OCR dropout is held")
@@ -150,6 +222,12 @@ do {
     tracker.update(with: [panned], at: 1.1, translations: ["Vietato fumare": "No smoking"])
     expect(tracker.items.count == 1 && tracker.items[0].id == id && tracker.items[0].box == panned.box,
            "fast pan: same words follow the text instead of leaving a ghost behind")
+    var wobbled = panned
+    wobbled.text = "Vietato fumare."
+    wobbled.box.origin.y -= 0.3
+    tracker.update(with: [wobbled], at: 1.15, translations: [:])
+    expect(tracker.items.count == 1 && tracker.items[0].id == id, "fast pan with a punctuation wobble still leaves no ghost")
+    tracker.update(with: [panned], at: 1.18, translations: [:])
 
     let other = TextBlock(text: "Ingresso", box: CGRect(x: 0.2, y: 0.8, width: 0.3, height: 0.04), lineCount: 1)
     tracker.update(with: [panned, other], at: 1.2, translations: [:])

@@ -71,6 +71,11 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      - name: Core logic tests # never ship a build that fails them
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/CoreTests/main.swift -o "$RUNNER_TEMP/core-tests"
+          "$RUNNER_TEMP/core-tests"
+
       # Archive unsigned: a signed archive would mint a new development certificate on every
       # fresh runner. Signing happens at export with Apple's cloud-managed distribution certificate.
       - name: Archive

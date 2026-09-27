@@ -25,6 +25,8 @@ final class AppModel {
     private(set) var torchOn = false
     private(set) var fastOCR = false
     private(set) var zoom: CGFloat = 1
+    /// Lens stops the zoom button cycles through, relative to the main lens.
+    private(set) var zoomStops: [CGFloat] = [1, 2]
 
     var isFrozen: Bool { frozenImage != nil }
     var fastOCRAvailable: Bool { TextRecognizer.fastModeAvailable }
@@ -59,7 +61,7 @@ final class AppModel {
             return
         }
         do {
-            try await camera.start()
+            zoomStops = try await camera.start()
             cameraState = .running
         } catch {
             cameraState = .unavailable(error.localizedDescription)
@@ -92,9 +94,14 @@ final class AppModel {
         camera.fastOCR = fastOCR
     }
 
-    func setZoom(_ factor: CGFloat) {
-        zoom = min(max(factor, 1), 8)
-        camera.setZoom(zoom)
+    func setZoom(_ factor: CGFloat, smooth: Bool = false) {
+        zoom = min(max(factor, 1), 10)
+        camera.setZoom(zoom, smooth: smooth)
+    }
+
+    /// 1× → 2× → telephoto → 1×, like the Camera app's lens button.
+    func cycleZoom() {
+        setZoom(zoomStops.first { $0 > zoom + 0.05 } ?? 1, smooth: true)
     }
 
     private func handle(_ result: FrameResult) {
@@ -104,6 +111,9 @@ final class AppModel {
         let now = ProcessInfo.processInfo.systemUptime
         imageSize = result.imageSize
         ocrMilliseconds = result.ocrMilliseconds
+        if result.imageSize.width > 0 {
+            tracker.imageAspect = result.imageSize.height / result.imageSize.width
+        }
 
         let visible = AspectFillMapper(imageSize: result.imageSize, viewSize: viewSize).visibleRect
         let blocks = result.blocks.filter { visible.contains(CGPoint(x: $0.box.midX, y: $0.box.midY)) }

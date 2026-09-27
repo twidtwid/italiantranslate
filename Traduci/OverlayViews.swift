@@ -26,16 +26,18 @@ struct TranslationBubble: View {
     let rect: CGRect
 
     var body: some View {
-        let box = rect.insetBy(dx: -4, dy: -3) // cover the Italian completely
+        // Exactly over the Italian it replaces. Inflating small boxes is what piled up dense text.
+        let box = rect.insetBy(dx: -3, dy: -1)
         let lineHeight = box.height / CGFloat(max(lineCount, 1))
         Text(text)
-            .font(.system(size: min(max(lineHeight * 0.7, 12), 40), weight: .semibold))
+            .font(.system(size: max(lineHeight * 0.75, 6), weight: .semibold))
             .foregroundStyle(.white)
-            .minimumScaleFactor(0.35)
-            .padding(.horizontal, 4)
-            .frame(width: max(box.width, 40), height: max(box.height, 20), alignment: .leading)
-            .background(Color.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .minimumScaleFactor(0.4)
+            .padding(.horizontal, 2)
+            .frame(width: box.width, height: box.height, alignment: .leading)
+            .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
             .position(x: box.midX, y: box.midY)
+            .animation(.easeOut(duration: 0.15), value: rect) // glide, don't jump, when the text really moves
     }
 }
 

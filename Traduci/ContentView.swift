@@ -64,6 +64,11 @@ struct ContentView: View {
         .gesture(pinchToZoom)
     }
 
+    private var zoomLabel: String {
+        let whole = model.zoom.rounded()
+        return abs(model.zoom - whole) < 0.05 ? "\(Int(whole))×" : String(format: "%.1f×", Double(model.zoom))
+    }
+
     private var pinchToZoom: some Gesture {
         MagnifyGesture()
             .onChanged { value in
@@ -118,15 +123,16 @@ struct ContentView: View {
                 FreezeButton(isFrozen: model.isFrozen || model.isFreezePending) { model.toggleFreeze() }
                 Spacer()
                 Button {
-                    model.setZoom(1)
+                    model.cycleZoom()
                 } label: {
-                    Text(model.zoom < 1.05 ? "1×" : String(format: "%.1f×", Double(model.zoom)))
+                    Text(zoomLabel)
                         .font(.footnote.weight(.bold).monospacedDigit())
                         .frame(width: 52, height: 52)
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Reset zoom")
+                .accessibilityLabel("Zoom \(zoomLabel)")
+                .accessibilityHint("Switches to the next lens")
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 16)

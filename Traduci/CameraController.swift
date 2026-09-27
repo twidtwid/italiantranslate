@@ -39,6 +39,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     // Session queue only.
     private var device: AVCaptureDevice?
     private var mainLensZoom: CGFloat = 1
+    private var zoomStops: [CGFloat] = [1, 2]
 
     private let lock = NSLock()
     private var _fastOCR = false
@@ -50,13 +51,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         set { locked { _fastOCR = newValue } }
     }
 
-    func start() async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+    /// Starts the camera and returns its zoom stops relative to the main lens, e.g. [1, 2, 5].
+    func start() async throws -> [CGFloat] {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CGFloat], Error>) in
             sessionQueue.async {
                 do {
                     if self.device == nil { try self.configure() }
                     if !self.session.isRunning { self.session.startRunning() }
-                    continuation.resume()
+                    continuation.resume(returning: self.zoomStops)
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -91,12 +93,16 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
     }
 
-    /// `factor` is relative to the main (1×) lens.
-    func setZoom(_ factor: CGFloat) {
+    /// `factor` is relative to the main (1×) lens. `smooth` ramps like the Camera app's lens buttons.
+    func setZoom(_ factor: CGFloat, smooth: Bool) {
         sessionQueue.async {
             guard let device = self.device, (try? device.lockForConfiguration()) != nil else { return }
-            let target = self.mainLensZoom * factor
-            device.videoZoomFactor = min(max(target, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+            let target = min(max(self.mainLensZoom * factor, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+            if smooth {
+                device.ramp(toVideoZoomFactor: target, withRate: 6)
+            } else {
+                device.videoZoomFactor = target
+            }
             device.unlockForConfiguration()
         }
     }
@@ -178,9 +184,13 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
         // Multi-lens virtual devices start on the ultra-wide at zoom 1.0. Start on the main lens like
         // the Camera app; the device still hops to the ultra-wide for macro when text is very close.
-        if device.constituentDevices.first?.deviceType == .builtInUltraWideCamera,
-           let mainLens = device.virtualDeviceSwitchOverVideoZoomFactors.first {
-            mainLensZoom = CGFloat(mainLens.doubleValue)
+        let switchOvers = device.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat($0.doubleValue) }
+        if device.constituentDevices.first?.deviceType == .builtInUltraWideCamera, let mainLens = switchOvers.first {
+            mainLensZoom = mainLens
+        }
+        // 1×, 2× (sensor crop), and the telephoto lens when there is one (5× on Pro iPhones).
+        if let telephoto = switchOvers.last.map({ $0 / mainLensZoom }), telephoto > 2.5 {
+            zoomStops = [1, 2, telephoto]
         }
         device.videoZoomFactor = min(max(mainLensZoom, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
     }

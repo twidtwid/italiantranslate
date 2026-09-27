@@ -44,7 +44,7 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 | Point at text | English covers the Italian it translates |
 | ⏸ (centre button) | Freezes the frame; tap any translation to read it full size, next to the original |
 | Flashlight | Torch, for dark restaurants |
-| Pinch / `1×` button | Zoom for far-away signs; tap to reset |
+| Pinch / `1×` button | Zoom for far-away signs. The button cycles 1× → 2× → 5× (telephoto) |
 | `Accurate` / `Fast` chip | Switches OCR modes. Fast wins on big clean signs, Accurate wins on menus and small print |
 | Top-left pill | Status, plus the latest OCR and translation (MT) times in ms |
 

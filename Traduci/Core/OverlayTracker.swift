@@ -15,14 +15,23 @@ struct OverlayItem: Identifiable, Equatable {
     var translation: String?
     var translationIsCurrent: Bool
     var lastSeen: TimeInterval
+    /// A different OCR reading of the same text, waiting to prove it isn't just noise.
+    var candidate: String? = nil
+    var candidateFrames = 0
 }
 
-/// Keeps overlays stable across OCR frames: matches new text to existing overlays, damps jitter,
-/// keeps the previous translation up while a changed reading is retranslated, and briefly holds
-/// overlays when OCR misses a line for a frame or two.
+/// Keeps overlays calm across OCR frames: matches new text to existing overlays, holds them still
+/// through hand shake, ignores flickering misreads, keeps the previous translation up while a
+/// changed reading is retranslated, and briefly holds overlays when OCR misses a line.
 struct OverlayTracker {
     private(set) var items: [OverlayItem] = []
     var minimumOverlap: CGFloat = 0.25
+    /// Upright frame height ÷ width, to weigh horizontal and vertical movement alike.
+    var imageAspect: CGFloat = 16.0 / 9.0
+    /// Readings at least this alike are the same text, misread; below it the text really changed.
+    var sameTextSimilarity = 0.6
+    /// Frames in a row a new reading of the same text must survive before it replaces the old one.
+    var framesToAdopt = 3
     private var lastUpdate: TimeInterval?
     private var frameInterval: TimeInterval = 0.1
 
@@ -36,31 +45,31 @@ struct OverlayTracker {
         var matchedItems = Set<Int>(), matchedBlocks = Set<Int>()
 
         // 1. Same place: best overlap wins.
-        var candidates: [(overlap: CGFloat, item: Int, block: Int)] = []
+        var pairs: [(overlap: CGFloat, item: Int, block: Int)] = []
         for (itemIndex, item) in items.enumerated() {
             for (blockIndex, block) in blocks.enumerated() {
                 let overlap = item.box.intersectionOverUnion(block.box)
                 if overlap >= minimumOverlap {
-                    candidates.append((overlap, itemIndex, blockIndex))
+                    pairs.append((overlap, itemIndex, blockIndex))
                 }
             }
         }
-        candidates.sort { $0.overlap > $1.overlap }
-        for candidate in candidates where !matchedItems.contains(candidate.item) && !matchedBlocks.contains(candidate.block) {
-            matchedItems.insert(candidate.item)
-            matchedBlocks.insert(candidate.block)
-            refresh(candidate.item, with: blocks[candidate.block], at: now, smooth: !exact, translations: translations)
+        pairs.sort { $0.overlap > $1.overlap }
+        for pair in pairs where !matchedItems.contains(pair.item) && !matchedBlocks.contains(pair.block) {
+            matchedItems.insert(pair.item)
+            matchedBlocks.insert(pair.block)
+            refresh(pair.item, with: blocks[pair.block], at: now, snap: exact, translations: translations)
         }
 
         // 2. Same words, somewhere else: the camera moved faster than overlaps can follow.
         for (blockIndex, block) in blocks.enumerated() where !matchedBlocks.contains(blockIndex) {
             let nearest = items.indices
-                .filter { !matchedItems.contains($0) && items[$0].source == block.text }
+                .filter { !matchedItems.contains($0) && Self.sameWords(items[$0], block.text) }
                 .min { items[$0].box.centerDistance(to: block.box) < items[$1].box.centerDistance(to: block.box) }
             guard let itemIndex = nearest else { continue }
             matchedItems.insert(itemIndex)
             matchedBlocks.insert(blockIndex)
-            refresh(itemIndex, with: block, at: now, smooth: false, translations: translations)
+            refresh(itemIndex, with: block, at: now, snap: true, translations: translations)
         }
 
         // 3. Everything else is new text.
@@ -103,32 +112,57 @@ struct OverlayTracker {
             .filter { queued.insert($0).inserted }
     }
 
-    private mutating func refresh(_ index: Int, with block: TextBlock, at now: TimeInterval, smooth: Bool, translations: [String: String]) {
+    private mutating func refresh(_ index: Int, with block: TextBlock, at now: TimeInterval, snap: Bool, translations: [String: String]) {
         var item = items[index]
-        item.box = smooth ? Self.steady(item.box, toward: block.box) : block.box
+        item.box = snap ? block.box : settle(item.box, toward: block.box, lines: block.lineCount)
         item.lineCount = block.lineCount
         item.lastSeen = now
-        if item.source != block.text {
-            item.source = block.text
-            item.translationIsCurrent = false
+
+        if block.text == item.source || TextNormalizer.isEffectivelySame(block.text, item.source) {
+            item.candidate = nil // same words; only case or punctuation wobbled
+            item.candidateFrames = 0
+        } else if TextNormalizer.similarity(block.text, item.source) < sameTextSimilarity {
+            // Different text now sits here: switch at once, and never show the old text's translation on it.
+            Self.adopt(block.text, into: &item)
+            item.translation = translations[block.text]
+        } else if block.text == item.candidate {
+            item.candidateFrames += 1
+            if item.candidateFrames >= framesToAdopt {
+                Self.adopt(block.text, into: &item) // keeps the old translation up until the new one lands
+            }
+        } else {
+            item.candidate = block.text
+            item.candidateFrames = 1
         }
-        if !item.translationIsCurrent, let translation = translations[block.text] {
+
+        if !item.translationIsCurrent, let translation = translations[item.source] {
             item.translation = translation
             item.translationIsCurrent = true
         }
         items[index] = item
     }
 
-    /// Small OCR jitter is damped so overlays sit still; real camera movement is followed immediately.
-    static func steady(_ old: CGRect, toward new: CGRect) -> CGRect {
-        let tolerance = max(new.height, 0.005) * 0.4
-        guard abs(new.midX - old.midX) < tolerance, abs(new.midY - old.midY) < tolerance else { return new }
-        return CGRect(
-            x: (old.minX + new.minX) / 2,
-            y: (old.minY + new.minY) / 2,
-            width: (old.width + new.width) / 2,
-            height: (old.height + new.height) / 2
-        )
+    /// Exact words only (case and punctuation aside): "similar" would confuse neighbouring menu items.
+    private static func sameWords(_ item: OverlayItem, _ text: String) -> Bool {
+        item.source == text || item.candidate == text || TextNormalizer.isEffectivelySame(item.source, text)
+    }
+
+    private static func adopt(_ text: String, into item: inout OverlayItem) {
+        item.source = text
+        item.translationIsCurrent = false
+        item.candidate = nil
+        item.candidateFrames = 0
+    }
+
+    /// Hand shake and OCR noise nudge boxes by a few points every frame. Overlays hold still until
+    /// the text has really moved or changed size, then jump there (the view animates the jump).
+    func settle(_ old: CGRect, toward new: CGRect, lines: Int) -> CGRect {
+        let lineHeight = new.height / CGFloat(max(lines, 1))
+        let moved = abs(new.midY - old.midY) > lineHeight * 0.45
+            || abs(new.midX - old.midX) > lineHeight * imageAspect * 0.6
+        let resized = abs(new.width - old.width) > old.width * 0.2
+            || abs(new.height - old.height) > old.height * 0.2
+        return moved || resized ? new : old
     }
 }
 

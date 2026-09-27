@@ -24,7 +24,7 @@ final class TranslationEngine {
     /// Drives `.translationTask`; invalidating it hands `run(session:)` a fresh session.
     var configuration = TranslationSession.Configuration(source: LanguagePair.source, target: LanguagePair.target)
     private(set) var status: Status = .preparing
-    /// Time until the first result of the latest batch arrived.
+    /// Time until the first result of the latest request arrived.
     private(set) var latencyMilliseconds: Double?
 
     @ObservationIgnored var onTranslation: ((String, String) -> Void)?
@@ -87,8 +87,10 @@ final class TranslationEngine {
         continuation.yield() // pick up anything requested while we were preparing
 
         for await _ in wakeups {
+            var batchSize = 1 // the most central text goes alone, so its translation shows up first
             while !pending.isEmpty, !Task.isCancelled {
-                let batch = Array(pending.prefix(Self.batchSize))
+                let batch = Array(pending.prefix(batchSize))
+                batchSize = Self.batchSize
                 pending.removeFirst(batch.count)
                 inFlight.formUnion(batch)
                 await translate(batch, using: session)
