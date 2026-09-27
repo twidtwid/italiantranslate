@@ -47,7 +47,14 @@ for url in frames(in: input) {
         "ocrMs": Int(accurateMs),
         "fastOcrMs": Int(fastMs),
         "fastLineCount": fastLines.count,
-        "lines": lines.map { ["text": $0.text, "box": numbers($0.box), "language": name(languages.language(of: $0.text))] },
+        "lines": lines.map { line in
+            [
+                "text": line.text,
+                "box": numbers(line.box),
+                "corners": line.corners.flatMap { [Double($0.x), Double($0.y)] }.map { ($0 * 10_000).rounded() / 10_000 },
+                "language": name(languages.language(of: line.text)),
+            ] as [String: Any]
+        },
         "blocks": blocks.map { ["text": $0.text, "box": numbers($0.box), "lines": $0.lineCount] },
     ], to: output.appendingPathComponent("\(frame).json"))
 

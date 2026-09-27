@@ -42,7 +42,12 @@ final class TextRecognizer {
         return (request.results ?? []).compactMap { observation in
             guard let best = observation.topCandidates(1).first, best.confidence >= 0.3 else { return nil }
             let box = observation.boundingBox // normalized, origin bottom-left
-            return OCRLine(text: best.string, box: CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height))
+            let corners = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
+            return OCRLine(
+                text: best.string,
+                box: CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height),
+                corners: corners.map { CGPoint(x: $0.x, y: 1 - $0.y) }
+            )
         }
     }
 }

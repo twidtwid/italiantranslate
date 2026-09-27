@@ -1,7 +1,7 @@
 name: Menu lab
 
-# Real Italian menus through the app's own OCR and grouping on a Mac, with Vision's document reader
-# alongside for comparison. Results go to the "lab" draft release (visible to collaborators only).
+# Real Italian menus through the app's own OCR and grouping on a Mac. Results go to the "lab"
+# draft release (visible to collaborators only).
 on:
   push:
     branches: ["claude/**"]
@@ -34,12 +34,6 @@ jobs:
         run: |
           xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
           "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
-
-      - name: Vision document reader
-        continue-on-error: true
-        run: |
-          xcrun swiftc -O -target arm64-apple-macos26.0 Tests/Lab/Common.swift Tests/Lab/Documents/main.swift -o "$RUNNER_TEMP/lab-documents"
-          "$RUNNER_TEMP/lab-documents" "$LAB/frames" "$LAB/documents"
 
       - name: Publish results
         if: always()

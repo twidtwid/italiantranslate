@@ -7,6 +7,9 @@ import CoreGraphics
 struct OCRLine: Equatable {
     var text: String
     var box: CGRect
+    /// The line's own corners (top left, top right, bottom right, bottom left), same coordinates as
+    /// `box`, when OCR reports them: a slanted line's box is taller than its text.
+    var corners: [CGPoint] = []
 }
 
 /// One or more lines that are translated as a unit and drawn as one overlay.
