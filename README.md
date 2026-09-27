@@ -28,7 +28,7 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 | `Accurate` / `Fast` chip | Switches OCR modes. Fast wins on big clean signs, Accurate wins on menus and small print |
 | Top-left pill | Status, plus the latest OCR and translation (MT) times in ms |
 
-The phone switches to the ultra-wide lens by itself for close-up (macro) text.
+The phone switches to the ultra-wide lens by itself for close-up (macro) text. Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
 
 ## How it works
 

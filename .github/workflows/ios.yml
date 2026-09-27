@@ -3,7 +3,9 @@ name: iOS build
 on:
   push:
     branches: [main, "claude/**"]
+    paths-ignore: ["**.md"]
   pull_request:
+    paths-ignore: ["**.md"]
   workflow_dispatch:
 
 concurrency:
@@ -54,7 +56,7 @@ jobs:
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/Traduci.app"
           ls -la "$APP"
           # The app's own Swift types must be in the binary, not just an empty shell.
-          for type in TranslationEngine CameraController OverlayTracker TextBlockBuilder; do
+          for type in AppModel ContentView TranslationEngine CameraController OverlayTracker; do
             strings "$APP/Traduci" | grep -q "$type" || { echo "::error::$type missing from binary"; exit 1; }
           done
           test -f "$APP/Assets.car"
