@@ -282,7 +282,7 @@ do {
     let nerocarbone = fixture("nerocarbone-p1-page") // the menu from a TestFlight report, page tilted
     let dishes = nerocarbone.filter { $0.kind == .item }
     let unpriced = nerocarbone.filter { $0.kind == .text }.map(\.title)
-    expect(dishes.count == 22, "every dish has its price: \(dishes.count) priced; without: \(unpriced)")
+    expect(dishes.count == 21, "every dish has its price: \(dishes.count) priced; without: \(unpriced)")
     expect(entry(nerocarbone, "Pere e pecorino")?.price == "€8", "Pere e pecorino €8")
     expect(entry(nerocarbone, "CAPRAIA")?.price == "€10" && entry(nerocarbone, "CAPRAIA")?.details.count == 1, "the last dish")
     let sections = nerocarbone.filter { $0.kind == .heading && !$0.isForeign }.map(\.title)

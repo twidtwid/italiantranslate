@@ -36,6 +36,8 @@ final class TranslationEngine {
     @ObservationIgnored private var wake: AsyncStream<Void>.Continuation?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var lastRestart = Date.distantPast
+    /// Demo mode (the Simulator has no translation models): English written out ahead of time.
+    @ObservationIgnored private var canned: [String: String]?
 
     private static let batchSize = 4
     private static let log = Logger(subsystem: "Traduci", category: "translation")
@@ -49,8 +51,21 @@ final class TranslationEngine {
 
     /// Replaces the queue with what is on screen now, most important first.
     func request(_ sources: [String]) {
+        if let canned {
+            for source in sources where cache[source] == nil {
+                let match = canned[source] ?? canned.first { TextNormalizer.similarity($0.key, source) >= 0.85 }?.value
+                if let match { store(match, for: source) }
+            }
+            return
+        }
         pending = sources.filter { cache[$0] == nil && !inFlight.contains($0) && !failed.contains($0) }
         if !pending.isEmpty { wake?.yield() }
+    }
+
+    /// Demo mode: answer from `translations` instead of a translation session.
+    func useCanned(_ translations: [String: String]) {
+        canned = translations
+        status = .ready(offline: true)
     }
 
     func retry() {
@@ -61,6 +76,7 @@ final class TranslationEngine {
 
     /// Runs for as long as the `.translationTask` that owns `session`.
     func run(session: TranslationSession) async {
+        guard canned == nil else { return }
         generation += 1
         let myGeneration = generation
         let (wakeups, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))

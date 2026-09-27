@@ -1,10 +1,11 @@
 # Traduci
 
-Point your iPhone at Italian and read English. Traduci opens straight into the camera and paints English over the Italian as you move.
+Point your iPhone at an Italian menu or sign and read it in English. Traduci opens straight into the camera. Hold still over the text (or tap) and it takes the picture, then gives you the page in English: every dish in a list you can read at the table, with its price and the Italian name to order by, and the English painted over the photo.
 
 - **Fully offline.** Apple's Vision reads the text and Apple's Translation framework translates it, both on the device. After a one-time download of the Italian language pack, it works in airplane mode.
-- **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. While you aim, the text nearest the centre is translated ahead, so it's ready the moment you hold still. Every result is cached, and the translation model is loaded before the first text shows up.
-- **Calm to read.** Translations are laid over a locked, sharp frame instead of chasing a shaking camera, the same way Apple's Translate app freezes the frame and Google Translate uses Scan mode for menus.
+- **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. While you aim, the text nearest the centre is translated ahead, so most of the page is already in English when the picture is taken. Every result is cached, and the translation model is loaded before the first text shows up.
+- **Reads menus like a diner.** It works out which lines are one dish, which are its ingredients and allergens, which price goes with it (in a price column, under a centred dish, or at the end of the ingredients), where the sections start, and which way the columns go. English that the menu already prints is left alone.
+- **Stays put.** The picture stays until you tap **Scan**: put the phone down, pass it across the table, it's still there.
 
 ## Install with TestFlight (no Mac)
 
@@ -40,41 +41,50 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 
 ## Using it
 
-**Aim, then read.**
-- **Aim:** point the phone at Italian. The camera stays clean while you move, and translation is already running in the background.
-- **Read:** hold still for a moment. Traduci locks a sharp frame, gives a light tap, and lays the English over the Italian in the page's own paper and ink colours. Nothing moves while you read.
-- **Move on:** turn to the next part of the menu and it goes back to aiming by itself, then locks again when you're steady.
+**Point, hold, read.**
+- **Point** at the menu. While you hold still over text, the ring around the shutter fills, then the picture is taken. Tap the shutter to take it straight away.
+- **Read.** The photo stays on screen with the English painted over the Italian. Below it is the menu in English: the sections, each dish with what's in it, its price, and the Italian name to order by.
+- **Scan** goes back to the camera for the next page.
 
 | | |
 |---|---|
-| Pinch the locked frame | Zoom into small print; drag to look around |
-| Tap a translation | Read it full size, next to the original |
-| Centre button | Lock now, or go back to the camera |
+| Drag the panel's top edge | A peek at the photo, half and half, or the whole list |
+| Tap a dish in the list | Find it on the photo: it's outlined and brought into view |
+| Tap a dish on the photo | Find it in the list |
+| Pinch the photo | Small print; drag to look around |
+| Share | The whole page as text, English with the Italian names and prices |
 | Flashlight | Torch, for dark restaurants |
 | Pinch while aiming / `1×` button | Camera zoom. The button cycles 1× → 2× → 5× (telephoto) |
-| `Accurate` / `Fast` chip | OCR mode. Fast suits big clean signs; Accurate suits menus and small print |
 | Top-left pill | Status, plus the latest OCR and translation (MT) times in ms |
 
-- English that's already printed on bilingual menus is left alone; only the Italian gets translated.
 - The phone switches to the ultra-wide lens by itself for close-up (macro) text.
 - Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
 
 ## How it works
 
 ```
-aiming:  camera ─► Vision OCR (it-IT) ─► lines → blocks ─► drop English ─► translate ahead, centre first (cached)
-                   newest frame only      paragraphs join,
-                                          menu lines don't
-reading: gyro says "still" ─► sharp frame ─► English painted in the page's paper and ink colours ─► pinch, tap
+aiming:   camera ─► Vision OCR, newest frame only ─► menu reader ─► translate ahead, centre first (cached)
+capture:  hold still or tap ─► freeze the frame ─► OCR it again in two overlapping bands (Vision reads at a
+          fixed working size, so a band is a closer look: small prices come out) ─► menu reader ─► the list,
+          and English painted over the photo in the page's own paper and ink colours
+menu reader: level the page ─► glue split lines ─► prices ─► dish / description / allergens / heading ─►
+             columns in reading order ─► the menu's own English set aside
 ```
 
 | File | Role |
 |---|---|
-| `Traduci/CameraController.swift` | Capture session, frame dropping, freeze, torch, zoom |
-| `Traduci/TextRecognizer.swift` | Vision OCR settings (`minimumTextHeight` trades small text against speed) |
+| `Traduci/CameraController.swift` | Capture session, frame dropping, freeze and close read, torch, zoom |
+| `Traduci/TextRecognizer.swift` | Vision OCR settings, and reading an image in bands |
 | `Traduci/TranslationEngine.swift` | On-device translation queue, cache, warm-up, self-healing session |
-| `Traduci/AppModel.swift`, `Traduci/MotionMonitor.swift` | Aim-and-read: when to lock a still and when to aim again |
-| `Traduci/Core/` | Camera-free logic: line grouping, language detection, page colours, screen mapping |
-| `Tests/CoreTests/main.swift` | Tests for `Core/`, run by CI |
+| `Traduci/AppModel.swift`, `Traduci/MotionMonitor.swift` | Point, hold, read: auto-capture, focus, the picture's zoom and pan |
+| `Traduci/ContentView.swift`, `Traduci/ReadingViews.swift` | The camera screen; the photo and the English list |
+| `Traduci/Core/MenuReader.swift` | Reads OCR lines as a menu: dishes, descriptions, prices, sections, columns |
+| `Traduci/Core/` | The rest of the camera-free logic: language detection, page colours, screen mapping |
+| `Tests/CoreTests/` | Tests for `Core/`, including real OCR of real menus (`Fixtures/`), run by CI |
+| `Tests/Lab/`, `.github/workflows/lab.yml` | The menu lab, below |
 | `.github/workflows/ios.yml` | Every push: core tests plus an iOS build with Xcode 26 and Xcode 27 |
-| `.github/workflows/testflight.yml`, `scripts/asc_preflight.py` | On demand: check the Apple setup, then archive, cloud-sign and upload to TestFlight |
+| `.github/workflows/testflight.yml`, `scripts/asc_preflight.py` | Check the Apple setup, then archive, cloud-sign and upload to TestFlight |
+
+## The menu lab
+
+Real Italian menus, run through the app's own OCR and menu reader on a Mac, and through the app itself in the iPhone Simulator. `Tests/Lab/menus.json` lists the menus (PDFs from restaurant websites, fetched when the lab runs, and one retyped from a TestFlight report). `fixtures.py` turns each page into phone-camera frames: the whole page from arm's length and closer looks, with a slight tilt, warm uneven light, blur and noise. The **Menu lab** workflow reads every frame, draws what it found, and screenshots the app on a few of them in demo mode (the Simulator has no camera and no translation models, so a picture stands in for the camera and `english.json` for the translator). Results go to a draft release named `lab`. Commits tagged `[lab]` skip TestFlight and the full build.

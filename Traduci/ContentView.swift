@@ -3,29 +3,41 @@ import Translation
 
 struct ContentView: View {
     @State private var model = AppModel()
-    @State private var selectedCaption: Caption?
     @State private var cameraZoomAtPinchStart: CGFloat?
-    @State private var stillAtGestureStart: (zoom: CGFloat, pan: CGSize)?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            switch model.cameraState {
-            case .denied:
-                CameraMessage(
-                    title: "Camera access is off",
-                    detail: "Traduci needs the camera to read Italian. Nothing leaves this iPhone.",
-                    showsSettingsButton: true
-                )
-            case .unavailable(let reason):
-                CameraMessage(title: "Camera unavailable", detail: reason, showsSettingsButton: false)
-            case .starting, .running:
-                viewfinder
-                controls
+        // Full screen, edge to edge; the safe area insets still come through for the controls.
+        GeometryReader { geometry in
+            let screen = geometry.size
+            ZStack {
+                Color.black
+                switch model.cameraState {
+                case .denied:
+                    CameraMessage(
+                        title: "Camera access is off",
+                        detail: "Traduci needs the camera to read Italian. Nothing leaves this iPhone.",
+                        showsSettingsButton: true
+                    )
+                case .unavailable(let reason):
+                    CameraMessage(title: "Camera unavailable", detail: reason, showsSettingsButton: false)
+                case .starting, .running:
+                    viewfinder
+                    if model.mode == .reading {
+                        ReadingScreen(model: model, size: screen, insets: geometry.safeAreaInsets)
+                            .transition(.opacity)
+                    } else {
+                        controls
+                            .padding(geometry.safeAreaInsets)
+                            .transition(.opacity)
+                    }
+                }
             }
+            .frame(width: screen.width, height: screen.height)
         }
+        .ignoresSafeArea()
         .statusBarHidden()
+        .animation(.easeOut(duration: 0.2), value: model.mode)
         .translationTask(model.engine.configuration) { session in
             await model.engine.run(session: session)
         }
@@ -34,76 +46,34 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.didEnterBackground() }
         }
-        .onChange(of: selectedCaption) { _, caption in
-            model.isShowingDetail = caption != nil
-        }
-        .sensoryFeedback(.impact(weight: .light), trigger: model.mode) { _, mode in mode == .reading }
-        .sheet(item: $selectedCaption) { caption in
-            TranslationDetail(caption: caption)
-        }
+        .sensoryFeedback(.impact(weight: .medium), trigger: model.mode) { _, mode in mode == .reading }
     }
 
+    /// The live camera, full screen (in demo mode, the demo picture).
     private var viewfinder: some View {
-        GeometryReader { geometry in
-            let mapper = AspectFillMapper(imageSize: model.imageSize, viewSize: geometry.size, zoom: model.stillZoom, pan: model.stillPan)
-            ZStack {
+        ZStack {
+            if let demo = model.demo {
+                Image(decorative: demo.image, scale: 1)
+                    .resizable()
+                    .scaledToFill()
+            } else {
                 CameraPreview(session: model.camera.session)
-                if let still = model.stillImage {
-                    let frame = mapper.imageFrame
-                    ZStack {
-                        Image(decorative: still, scale: 1)
-                            .resizable()
-                            .frame(width: frame.width, height: frame.height)
-                            .position(x: frame.midX, y: frame.midY)
-                        ReadingLayer(captions: model.captions, mapper: mapper) { selectedCaption = $0 }
-                    }
-                    .transition(.opacity)
-                }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipped()
-            .contentShape(Rectangle())
-            .animation(.easeOut(duration: 0.18), value: model.mode)
-            .gesture(pinch)
-            .simultaneousGesture(pan)
-            .onChange(of: geometry.size, initial: true) { _, size in
-                model.viewSize = size
             }
         }
-        .ignoresSafeArea()
+        .clipped()
+        .contentShape(Rectangle())
+        .gesture(pinch)
     }
 
-    /// Aiming: camera zoom. Reading: magnify the still.
     private var pinch: some Gesture {
         MagnifyGesture()
             .onChanged { value in
-                if model.mode == .reading {
-                    let start = stillAtGestureStart ?? (zoom: model.stillZoom, pan: model.stillPan)
-                    stillAtGestureStart = start
-                    model.zoomStill(to: start.zoom * value.magnification, from: start)
-                } else {
-                    let start = cameraZoomAtPinchStart ?? model.zoom
-                    cameraZoomAtPinchStart = start
-                    model.setZoom(start * value.magnification)
-                }
+                guard model.mode == .aiming else { return }
+                let start = cameraZoomAtPinchStart ?? model.zoom
+                cameraZoomAtPinchStart = start
+                model.setZoom(start * value.magnification)
             }
-            .onEnded { _ in
-                cameraZoomAtPinchStart = nil
-                stillAtGestureStart = nil
-            }
-    }
-
-    /// Reading a magnified still: drag it around.
-    private var pan: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onChanged { value in
-                guard model.mode == .reading, model.stillZoom > 1 else { return }
-                let start = stillAtGestureStart ?? (zoom: model.stillZoom, pan: model.stillPan)
-                stillAtGestureStart = start
-                model.panStill(to: CGSize(width: start.pan.width + value.translation.width,
-                                          height: start.pan.height + value.translation.height))
-            }
-            .onEnded { _ in stillAtGestureStart = nil }
+            .onEnded { _ in cameraZoomAtPinchStart = nil }
     }
 
     private var zoomLabel: String {
@@ -112,9 +82,9 @@ struct ContentView: View {
     }
 
     private var hint: String? {
-        guard model.mode == .aiming, model.cameraState == .running else { return nil }
-        if model.isLocking { return "Reading…" }
-        return model.textInView ? "Hold steady to translate" : "Point at Italian text"
+        guard model.cameraState == .running else { return nil }
+        if model.isCapturing { return "Reading…" }
+        return model.textInView ? "Hold still, or tap to translate" : "Point at a menu or a sign"
     }
 
     private var controls: some View {
@@ -122,19 +92,6 @@ struct ContentView: View {
             HStack(alignment: .top) {
                 StatusPill(engine: model.engine, ocrMilliseconds: model.ocrMilliseconds)
                 Spacer(minLength: 12)
-                if model.fastOCRAvailable, model.mode == .aiming {
-                    Button {
-                        model.toggleFastOCR()
-                    } label: {
-                        Label(model.fastOCR ? "Fast" : "Accurate", systemImage: model.fastOCR ? "hare.fill" : "tortoise.fill")
-                            .font(.footnote.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
-                            .background(.ultraThinMaterial, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Switches text recognition between accurate and fast")
-                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -142,49 +99,70 @@ struct ContentView: View {
             Spacer()
 
             if let hint {
-                Label(hint, systemImage: "text.viewfinder")
+                Text(hint)
                     .font(.footnote.weight(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 18)
                     .contentTransition(.opacity)
                     .animation(.easeInOut(duration: 0.2), value: hint)
             }
 
             HStack {
-                if model.mode == .aiming {
-                    RoundButton(
-                        systemImage: model.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
-                        label: model.torchOn ? "Torch off" : "Torch on",
-                        action: { model.toggleTorch() }
-                    )
-                } else {
-                    Color.clear.frame(width: 52, height: 52)
-                }
+                RoundButton(
+                    systemImage: model.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
+                    label: model.torchOn ? "Torch off" : "Torch on",
+                    action: { model.toggleTorch() }
+                )
                 Spacer()
-                LockButton(isReading: model.mode == .reading || model.isLocking) { model.toggleLock() }
+                ShutterButton(progress: model.captureProgress, isBusy: model.isCapturing) { model.capture() }
                 Spacer()
-                if model.mode == .aiming {
-                    Button {
-                        model.cycleZoom()
-                    } label: {
-                        Text(zoomLabel)
-                            .font(.footnote.weight(.bold).monospacedDigit())
-                            .frame(width: 52, height: 52)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Zoom \(zoomLabel)")
-                    .accessibilityHint("Switches to the next lens")
-                } else {
-                    Color.clear.frame(width: 52, height: 52)
+                Button {
+                    model.cycleZoom()
+                } label: {
+                    Text(zoomLabel)
+                        .font(.footnote.weight(.bold).monospacedDigit())
+                        .frame(width: 52, height: 52)
+                        .background(.ultraThinMaterial, in: Circle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Zoom \(zoomLabel)")
+                .accessibilityHint("Switches to the next lens")
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 16)
         }
         .foregroundStyle(.white)
+    }
+}
+
+/// The shutter. Its ring fills while the phone is held still over text, and the picture is taken
+/// when it's full; tap it to take the picture now.
+private struct ShutterButton: View {
+    let progress: Double
+    let isBusy: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.4), lineWidth: 4).frame(width: 78, height: 78)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(Color.accentWarm, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 78, height: 78)
+                    .animation(.linear(duration: 0.15), value: progress)
+                Circle().fill(Color.white).frame(width: 64, height: 64).scaleEffect(isBusy ? 0.86 : 1)
+                Image(systemName: "text.viewfinder")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.black)
+            }
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isBusy)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Translate what's in view")
     }
 }
 
@@ -254,27 +232,6 @@ private struct RoundButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-}
-
-/// Read what's in view now, or go back to aiming. Holding still does the same by itself.
-private struct LockButton: View {
-    let isReading: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle().stroke(Color.white, lineWidth: 4).frame(width: 76, height: 76)
-                Circle().fill(Color.white).frame(width: 62, height: 62)
-                Image(systemName: isReading ? "camera.fill" : "text.viewfinder")
-                    .font(.title2)
-                    .foregroundStyle(.black)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isReading ? "Back to the camera" : "Translate what's in view")
     }
 }
 

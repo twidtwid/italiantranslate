@@ -50,7 +50,7 @@ enum OCRTiles {
         guard !overlap.isNull else { return false }
         let smaller = min(a.box.width * a.box.height, b.box.width * b.box.height)
         guard smaller > 0, overlap.width * overlap.height >= 0.5 * smaller else { return false }
-        return a.text.contains(b.text) || b.text.contains(a.text) || TextNormalizer.similarity(a.text, b.text) >= 0.5
+        return a.text.contains(b.text) || b.text.contains(a.text) || TextNormalizer.similarity(a.text, b.text) >= 0.75
     }
 }
 

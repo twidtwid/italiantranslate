@@ -14,11 +14,12 @@ final class MotionMonitor {
         var movedSharply: Bool
     }
 
-    // Tuning. Hand tremor while holding a phone to read is roughly 0.02–0.1 rad/s.
-    static let stillRate = 0.12 // rad/s
-    static let stillAcceleration = 0.05 // g
-    static let sharpTurnRate = 0.8 // rad/s: re-aiming, not drifting
-    static let sharpJolt = 0.25 // g
+    // Tuning, generous on purpose: an arm held out over a menu shakes more than a phone at rest.
+    // (The app also locks when the camera sees the same text three frames running.)
+    static let stillRate = 0.25 // rad/s
+    static let stillAcceleration = 0.12 // g
+    static let sharpTurnRate = 0.9 // rad/s: re-aiming, not drifting
+    static let sharpJolt = 0.35 // g
 
     var onReading: ((Reading) -> Void)?
 

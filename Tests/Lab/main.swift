@@ -17,7 +17,7 @@ try FileManager.default.createDirectory(at: output, withIntermediateDirectories:
 let recognizer = TextRecognizer()
 let languages = LanguageDetector()
 var summary = "# Menu lab\n\n"
-var comparison = "Lines / price lines / ms, reading the whole frame vs in 2, 3, 4 bands.\n\n| frame | whole | 2 bands | 3 bands | 4 bands |\n|---|---|---|---|---|\n"
+var comparison = "Lines / price lines / ms: the whole frame, then as a capture reads it (whole + 2 bands).\n\n| frame | whole | capture |\n|---|---|---|\n"
 
 /// Price-like lines ("€ 12", "11,00", "EURO 8"): the small print a whole-page shot tends to lose.
 func priceCount(_ lines: [OCRLine]) -> Int {
@@ -85,16 +85,11 @@ for url in frames(in: input) {
     let whole = recognizer.lines(in: image, orientation: .up, fast: false)
     let wholeMs = Date().timeIntervalSince(started) * 1000
     var row = "| \(frame) | \(whole.count) / \(priceCount(whole)) / \(Int(wholeMs))"
-    var banded: [Int: [OCRLine]] = [:]
-    for bands in [2, 3, 4] {
-        started = Date()
-        let lines = recognizer.lines(in: image, fast: false, bands: bands)
-        row += " | \(lines.count) / \(priceCount(lines)) / \(Int(Date().timeIntervalSince(started) * 1000))"
-        banded[bands] = lines
-    }
+    started = Date()
+    let lines = OCRTiles.merge([whole, recognizer.lines(in: image, fast: false, bands: 2)]) // what a capture reads
+    row += " | \(lines.count) / \(priceCount(lines)) / \(Int(Date().timeIntervalSince(started) * 1000))"
     comparison += row + " |\n"
 
-    let lines = banded[3] ?? whole // what a capture reads
     let entries = MenuReader.entries(from: lines, aspect: aspect, language: languages.language(of:))
     let wholeEntries = MenuReader.entries(from: whole, aspect: aspect, language: languages.language(of:))
 
@@ -139,7 +134,7 @@ for url in frames(in: input) {
         }
     }
 
-    summary += "## \(frame)\n\nOCR \(Int(wholeMs)) ms, \(whole.count) lines whole, \(lines.count) in 3 bands. "
+    summary += "## \(frame)\n\nOCR \(Int(wholeMs)) ms, \(whole.count) lines whole, \(lines.count) as a capture reads it. "
     summary += "\(entries.count) entries (\(entries.filter { $0.price != nil }.count) priced).\n\n"
     summary += describe(entries) + "\n\n"
     print("\(frame): \(lines.count) lines, \(entries.count) entries, \(Int(wholeMs)) ms")

@@ -2,15 +2,21 @@ import AVFoundation
 import CoreImage
 import QuartzCore
 
+/// What the camera saw in one live frame.
 struct FrameResult: @unchecked Sendable {
-    let blocks: [TextBlock]
+    let entries: [MenuEntry]
     /// Upright (portrait) frame size in pixels.
     let imageSize: CGSize
     let ocrMilliseconds: Double
-    /// The exact frame the blocks came from; only set when a still was requested.
-    let snapshot: CGImage?
-    /// Paper and ink around each block, sampled from the still (same order as `blocks`).
-    let colors: [InkSampler.Colors]?
+}
+
+/// A still, read closely: the page in bands, so the small print (prices, allergens) comes out.
+struct StillResult: @unchecked Sendable {
+    let image: CGImage
+    let entries: [MenuEntry]
+    /// Paper and ink around each entry's title (same order as `entries`).
+    let colors: [InkSampler.Colors?]
+    let ocrMilliseconds: Double
 }
 
 enum CameraError: LocalizedError {
@@ -25,13 +31,18 @@ enum CameraError: LocalizedError {
     }
 }
 
-/// Owns the capture session and runs OCR on the newest frame whenever the previous pass is done.
-/// Frames that arrive while OCR is busy are dropped, never queued, so results are always fresh.
-/// While the user reads a still, it only glances now and then, to notice when the page changes.
+/// Owns the capture session and reads the newest frame whenever the previous read is done. Frames
+/// that arrive while OCR is busy are dropped, never queued, so what it reports is always fresh.
+/// Taking a still freezes the newest frame that had text, reads it closely, and pauses until
+/// `resume()`: nothing moves while the user reads.
 final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let session = AVCaptureSession()
-    /// Called on the frame queue after every processed frame.
+    /// Called on the frame queue after every live frame.
     var onFrame: (@Sendable (FrameResult) -> Void)?
+    /// Called on the frame queue the moment a still is taken, before it's read: freeze on it.
+    var onFreeze: (@Sendable (CGImage) -> Void)?
+    /// Called on the frame queue when the still has been read.
+    var onStill: (@Sendable (StillResult) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "Traduci.session")
     private let frameQueue = DispatchQueue(label: "Traduci.frames", qos: .userInteractive)
@@ -42,21 +53,25 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     // Session queue only.
     private var device: AVCaptureDevice?
-    /// Read on the frame queue, to take stills only once autofocus has settled.
-    private weak var focusDevice: AVCaptureDevice?
     private var mainLensZoom: CGFloat = 1
     private var zoomStops: [CGFloat] = [1, 2]
 
-    private let lock = NSLock()
-    private var _fastOCR = false
-    private var _stillRequested = false
-    private var _stillRequestedAt: CFTimeInterval = 0
-    private var _checkInterval: CFTimeInterval = 0 // 0: every frame; while reading, an occasional glance
-    private var _lastProcessed: CFTimeInterval = 0
+    // Frame queue only.
+    private var paused = false
+    private var stillRequested = false
+    /// The newest frame that had text: a still freezes that one at once instead of waiting.
+    private var lastTextFrame: TextFrame?
+    private var demoTimer: DispatchSourceTimer?
 
-    var fastOCR: Bool {
-        get { locked { _fastOCR } }
-        set { locked { _fastOCR = newValue } }
+    private enum Picture {
+        case buffer(CVPixelBuffer) // sensor layout: landscape
+        case image(CGImage) // already upright (demo mode)
+    }
+
+    private struct TextFrame {
+        let picture: Picture
+        let lines: [OCRLine]
+        let time: CFTimeInterval
     }
 
     /// Starts the camera and returns its zoom stops relative to the main lens, e.g. [1, 2, 5].
@@ -74,19 +89,38 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
     }
 
-    /// Delivers the next sharp frame as a still, then only glances at the camera until `resume()`.
-    func takeStill() {
-        locked {
-            _stillRequested = true
-            _stillRequestedAt = CACurrentMediaTime()
+    /// Demo mode (Simulator screenshots): `image` stands in for the camera, a few frames a second.
+    func startDemo(with image: CGImage) {
+        frameQueue.async {
+            let timer = DispatchSource.makeTimerSource(queue: self.frameQueue)
+            timer.schedule(deadline: .now(), repeating: 0.25)
+            timer.setEventHandler { [weak self] in
+                guard let self, !self.paused else { return }
+                self.process(.image(image))
+            }
+            timer.resume()
+            self.demoTimer = timer
         }
     }
 
-    /// Back to reading every frame.
+    /// Freezes the newest frame that had text (or, with none lately, the next frame), reads it
+    /// closely, then stays paused until `resume()`.
+    func takeStill() {
+        frameQueue.async {
+            if let frame = self.lastTextFrame, CACurrentMediaTime() - frame.time < 0.8 {
+                self.read(frame.picture, lines: frame.lines)
+            } else {
+                self.stillRequested = true
+            }
+        }
+    }
+
+    /// Back to reading every frame. Queued behind any pending still, so the two can't cross.
     func resume() {
-        locked {
-            _stillRequested = false
-            _checkInterval = 0
+        frameQueue.async {
+            self.paused = false
+            self.stillRequested = false
+            self.lastTextFrame = nil
         }
     }
 
@@ -122,39 +156,71 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     // MARK: - Frames
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        let now = CACurrentMediaTime()
-        let (fast, wantsStill, requestedAt, interval, last) = locked { (_fastOCR, _stillRequested, _stillRequestedAt, _checkInterval, _lastProcessed) }
-        guard wantsStill || now - last >= interval, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        locked { _lastProcessed = now }
+        guard !paused, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        process(.buffer(pixelBuffer))
+    }
+
+    /// Frame queue only.
+    private func process(_ picture: Picture) {
+        let started = CACurrentMediaTime()
+        let lines: [OCRLine]
+        switch picture {
+        case .buffer(let buffer):
+            // Buffers stay in the sensor's landscape layout; `.right` tells Vision the phone is upright.
+            lines = recognizer.lines(in: buffer, orientation: .right, fast: false)
+        case .image(let image):
+            lines = recognizer.lines(in: image, orientation: .up, fast: false)
+        }
+        let ocrMilliseconds = (CACurrentMediaTime() - started) * 1000
+        if stillRequested {
+            read(picture, lines: lines)
+            return
+        }
+        let size = uprightSize(picture)
+        let entries = MenuReader.entries(from: lines, aspect: size.height / max(size.width, 1), language: languages.language(of:))
+        if !entries.isEmpty {
+            lastTextFrame = TextFrame(picture: picture, lines: lines, time: CACurrentMediaTime())
+        }
+        onFrame?(FrameResult(entries: entries, imageSize: size, ocrMilliseconds: ocrMilliseconds))
+    }
+
+    /// Frame queue only: freeze on `picture`, then read it in bands for the small print.
+    private func read(_ picture: Picture, lines: [OCRLine]) {
+        paused = true
+        stillRequested = false
+        lastTextFrame = nil
+        let still: CGImage
+        switch picture {
+        case .image(let image):
+            still = image
+        case .buffer(let buffer):
+            let upright = CIImage(cvPixelBuffer: buffer).oriented(.right)
+            guard let image = ciContext.createCGImage(upright, from: upright.extent) else {
+                paused = false
+                return
+            }
+            still = image
+        }
+        onFreeze?(still)
 
         let started = CACurrentMediaTime()
-        // Buffers stay in the sensor's landscape layout; `.right` tells Vision the phone is held upright.
-        let lines = recognizer.lines(in: pixelBuffer, orientation: .right, fast: fast)
-        let ocrMilliseconds = (CACurrentMediaTime() - started) * 1000
-        let aspect = CGFloat(CVPixelBufferGetWidth(pixelBuffer)) / CGFloat(CVPixelBufferGetHeight(pixelBuffer)) // upright height ÷ width
-        let blocks = TextBlockBuilder.blocks(from: lines, aspect: aspect, language: languages.language(of:))
+        let closer = recognizer.lines(in: still, fast: false, bands: 2)
+        let merged = OCRTiles.merge([lines, closer])
+        let aspect = CGFloat(still.height) / CGFloat(max(still.width, 1))
+        let entries = MenuReader.entries(from: merged, aspect: aspect, language: languages.language(of:))
+        let sampler = InkSampler(image: still)
+        let colors = entries.map { entry in sampler.map { $0.colors(for: entry.titleBox) } }
+        onStill?(StillResult(image: still, entries: entries, colors: colors,
+                             ocrMilliseconds: (CACurrentMediaTime() - started) * 1000))
+    }
 
-        var snapshot: CGImage?
-        var colors: [InkSampler.Colors]?
-        // A still only once autofocus has settled (or half a second has passed), so it reads sharply.
-        if wantsStill, !(focusDevice?.isAdjustingFocus ?? false) || now - requestedAt > 0.5 {
-            let upright = CIImage(cvPixelBuffer: pixelBuffer).oriented(.right)
-            if let still = ciContext.createCGImage(upright, from: upright.extent) {
-                let stillWanted = locked { () -> Bool in
-                    guard _stillRequested else { return false } // back to aiming while we were busy
-                    _stillRequested = false
-                    _checkInterval = 0.7
-                    return true
-                }
-                if stillWanted {
-                    snapshot = still
-                    colors = InkSampler(image: still).map { sampler in blocks.map { sampler.colors(for: $0.box) } }
-                }
-            }
+    private func uprightSize(_ picture: Picture) -> CGSize {
+        switch picture {
+        case .buffer(let buffer):
+            return CGSize(width: CVPixelBufferGetHeight(buffer), height: CVPixelBufferGetWidth(buffer))
+        case .image(let image):
+            return CGSize(width: image.width, height: image.height)
         }
-
-        let uprightSize = CGSize(width: CVPixelBufferGetHeight(pixelBuffer), height: CVPixelBufferGetWidth(pixelBuffer))
-        onFrame?(FrameResult(blocks: blocks, imageSize: uprightSize, ocrMilliseconds: ocrMilliseconds, snapshot: snapshot, colors: colors))
     }
 
     // MARK: - Setup
@@ -168,7 +234,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
         guard session.canAddInput(input) else { throw CameraError.cannotAddInput }
         session.addInput(input)
-        // 1080p: sharp enough for menu text, light enough for OCR to keep up.
+        // 1080p: Vision reads at a fixed working size anyway (a 4K frame finds nothing more), and
+        // a still is read again in bands for the small print.
         if session.canSetSessionPreset(.hd1920x1080) {
             session.sessionPreset = .hd1920x1080
         }
@@ -187,7 +254,6 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             device.unlockForConfiguration()
         }
         self.device = device
-        focusDevice = device
     }
 
     private func tune(_ device: AVCaptureDevice) {
@@ -226,11 +292,5 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
         }
         return nil
-    }
-
-    private func locked<T>(_ body: () -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body()
     }
 }
