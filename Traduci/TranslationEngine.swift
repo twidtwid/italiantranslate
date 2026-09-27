@@ -84,6 +84,7 @@ final class TranslationEngine {
         defer { if generation == myGeneration { wake = nil } }
 
         let availability = await LanguageAvailability().status(from: LanguagePair.source, to: LanguagePair.target)
+        guard canned == nil else { return } // demo mode began while we were asking
         if availability == .unsupported {
             status = .unsupported
             return

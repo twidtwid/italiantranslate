@@ -7,35 +7,37 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        // Full screen, edge to edge; the safe area insets still come through for the controls.
-        GeometryReader { geometry in
-            let screen = geometry.size
-            ZStack {
-                Color.black
-                switch model.cameraState {
-                case .denied:
-                    CameraMessage(
-                        title: "Camera access is off",
-                        detail: "Traduci needs the camera to read Italian. Nothing leaves this iPhone.",
-                        showsSettingsButton: true
-                    )
-                case .unavailable(let reason):
-                    CameraMessage(title: "Camera unavailable", detail: reason, showsSettingsButton: false)
-                case .starting, .running:
-                    viewfinder
-                    if model.mode == .reading {
-                        ReadingScreen(model: model, size: screen, insets: geometry.safeAreaInsets)
-                            .transition(.opacity)
-                    } else {
-                        controls
-                            .padding(geometry.safeAreaInsets)
-                            .transition(.opacity)
+        ZStack {
+            Color.black.ignoresSafeArea()
+            switch model.cameraState {
+            case .denied:
+                CameraMessage(
+                    title: "Camera access is off",
+                    detail: "Traduci needs the camera to read Italian. Nothing leaves this iPhone.",
+                    showsSettingsButton: true
+                )
+            case .unavailable(let reason):
+                CameraMessage(title: "Camera unavailable", detail: reason, showsSettingsButton: false)
+            case .starting, .running:
+                viewfinder.ignoresSafeArea()
+                if model.mode == .reading {
+                    // Edge to edge, but knowing where the Dynamic Island and the home bar are.
+                    GeometryReader { safe in
+                        let insets = safe.safeAreaInsets
+                        ReadingScreen(
+                            model: model,
+                            size: CGSize(width: safe.size.width + insets.leading + insets.trailing,
+                                         height: safe.size.height + insets.top + insets.bottom),
+                            insets: insets
+                        )
+                        .ignoresSafeArea()
                     }
+                    .transition(.opacity)
+                } else {
+                    controls.transition(.opacity)
                 }
             }
-            .frame(width: screen.width, height: screen.height)
         }
-        .ignoresSafeArea()
         .statusBarHidden()
         .animation(.easeOut(duration: 0.2), value: model.mode)
         .translationTask(model.engine.configuration) { session in

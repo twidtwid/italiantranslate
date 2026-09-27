@@ -74,6 +74,7 @@ final class AppModel {
     @ObservationIgnored private var steadyFor: TimeInterval = 0
 
     init() {
+        if let demo { engine.useCanned(demo.translations) }
         engine.onTranslation = { [weak self] source, translation in
             self?.didTranslate(source, to: translation)
         }
@@ -102,7 +103,6 @@ final class AppModel {
 
     func start() async {
         if let demo {
-            engine.useCanned(demo.translations)
             cameraState = .running
             if demo.stage == .live { autoCaptureArmed = false }
             camera.startDemo(with: demo.image)
@@ -201,6 +201,10 @@ final class AppModel {
         previousEntries = entries
         textSince = textInView ? (textSince ?? now) : nil
         engine.request(Captions.priority(entries, centralFirst: true)) // translate ahead: reading starts translated
+        if demo?.stage == .reading, textInView {
+            capture() // screenshots: no need to wait for a still picture to hold still
+            return
+        }
         updateCaptureProgress(now: now)
     }
 

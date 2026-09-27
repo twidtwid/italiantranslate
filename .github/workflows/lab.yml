@@ -79,13 +79,13 @@ jobs:
           }
           shoot 0-warmup nerocarbone-p1-page.jpg 10 -demoStage live
           shoot 1-aiming nerocarbone-p1-page.jpg 6 -demoStage live
-          shoot 2-menu-half nerocarbone-p1-page.jpg 16
-          shoot 3-menu-full nerocarbone-p1-page.jpg 16 -demoPanel full
-          shoot 4-closer-focus nerocarbone-p1-middle.jpg 16 -demoFocus 6
-          shoot 5-centred sanpastore-p1-page.jpg 16
-          shoot 6-two-columns casadelconte-p1-middle.jpg 16
-          shoot 7-bilingual-peek piccadilly-p1-top.jpg 16 -demoPanel peek
-          shoot 8-bilingual-full piccadilly-p1-page.jpg 18 -demoPanel full
+          shoot 2-menu-half nerocarbone-p1-page.jpg 24
+          shoot 3-menu-full nerocarbone-p1-page.jpg 24 -demoPanel full
+          shoot 4-closer-focus nerocarbone-p1-middle.jpg 24 -demoFocus 9
+          shoot 5-centred sanpastore-p1-page.jpg 24
+          shoot 6-two-columns casadelconte-p1-middle.jpg 32
+          shoot 7-bilingual-peek piccadilly-p1-top.jpg 28 -demoPanel peek
+          shoot 8-bilingual-full piccadilly-p1-page.jpg 28 -demoPanel full
           ls -la "$LAB/screens"
 
       - name: Publish results

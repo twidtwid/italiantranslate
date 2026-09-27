@@ -341,7 +341,7 @@ struct ReadingPanel: View {
                     .padding(.bottom, bottomInset + 24)
                 }
                 .onChange(of: model.focusedID) { _, id in
-                    guard let id, !model.focusFromList else { return }
+                    guard let id, !model.focusFromList || model.demo != nil else { return }
                     withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
