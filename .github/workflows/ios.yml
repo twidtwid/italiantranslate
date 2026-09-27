@@ -56,7 +56,7 @@ jobs:
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/Traduci.app"
           ls -la "$APP"
           # The app's own Swift types must be in the binary, not just an empty shell.
-          for type in AppModel ContentView TranslationEngine CameraController OverlayTracker; do
+          for type in AppModel ContentView TranslationEngine CameraController MotionMonitor LanguageDetector; do
             strings "$APP/Traduci" | grep -q "$type" || { echo "::error::$type missing from binary"; exit 1; }
           done
           test -f "$APP/Assets.car"
