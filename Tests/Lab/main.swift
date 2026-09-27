@@ -15,7 +15,17 @@ let output = URL(fileURLWithPath: arguments[2])
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
 let recognizer = TextRecognizer()
+let fineRecognizer = TextRecognizer(minimumTextHeight: 0) // does finer OCR find the small print?
 let languages = LanguageDetector()
+var comparison = "| frame | lines 1/64 | lines 0 | prices 1/64 | prices 0 | ms 1/64 | ms 0 |\n|---|---|---|---|---|---|---|\n"
+
+/// Price-like lines ("€ 12", "11,00", "EURO 8"): the small print a whole-page shot tends to lose.
+func priceCount(_ lines: [OCRLine]) -> Int {
+    lines.filter { line in
+        let text = line.text.replacingOccurrences(of: " ", with: "")
+        return text.count <= 9 && text.contains(where: \.isNumber) && text.filter(\.isLetter).count <= 4
+    }.count
+}
 var summary = "# Menu lab\n\n"
 
 func name(_ language: TextLanguage) -> String {
@@ -38,6 +48,11 @@ for url in frames(in: input) {
     let fastLines = recognizer.lines(in: image, orientation: .up, fast: true)
     let fastMs = Date().timeIntervalSince(started) * 1000
 
+    started = Date()
+    let fineLines = fineRecognizer.lines(in: image, orientation: .up, fast: false)
+    let fineMs = Date().timeIntervalSince(started) * 1000
+    comparison += "| \(frame) | \(lines.count) | \(fineLines.count) | \(priceCount(lines)) | \(priceCount(fineLines)) | \(Int(accurateMs)) | \(Int(fineMs)) |\n"
+
     let blocks = TextBlockBuilder.blocks(from: lines, aspect: aspect, language: languages.language(of:))
 
     try writeJSON([
@@ -47,12 +62,22 @@ for url in frames(in: input) {
         "ocrMs": Int(accurateMs),
         "fastOcrMs": Int(fastMs),
         "fastLineCount": fastLines.count,
+        "fineLines": fineLines.map { line in
+            [
+                "text": line.text,
+                "box": numbers(line.box),
+                "corners": line.corners.flatMap { [Double($0.x), Double($0.y)] }.map { ($0 * 10_000).rounded() / 10_000 },
+                "language": name(languages.language(of: line.text)),
+                "hypotheses": languages.hypotheses(for: line.text),
+            ] as [String: Any]
+        },
         "lines": lines.map { line in
             [
                 "text": line.text,
                 "box": numbers(line.box),
                 "corners": line.corners.flatMap { [Double($0.x), Double($0.y)] }.map { ($0 * 10_000).rounded() / 10_000 },
                 "language": name(languages.language(of: line.text)),
+                "hypotheses": languages.hypotheses(for: line.text),
             ] as [String: Any]
         },
         "blocks": blocks.map { ["text": $0.text, "box": numbers($0.box), "lines": $0.lineCount] },
@@ -91,3 +116,4 @@ for url in frames(in: input) {
 }
 
 try summary.write(to: output.appendingPathComponent("summary.md"), atomically: true, encoding: .utf8)
+try comparison.write(to: output.appendingPathComponent("fine-ocr.md"), atomically: true, encoding: .utf8)

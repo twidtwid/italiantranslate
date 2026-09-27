@@ -25,6 +25,16 @@ final class LanguageDetector {
         return result
     }
 
+    /// The recognizer's top guesses with their probabilities, for tuning ("it": 0.62, "en": 0.3).
+    func hypotheses(for text: String) -> [String: Double] {
+        recognizer.reset()
+        recognizer.languageConstraints = Self.candidates
+        recognizer.processString(text)
+        return recognizer.languageHypotheses(withMaximum: 3).reduce(into: [:]) { result, pair in
+            result[pair.key.rawValue] = (pair.value * 1_000).rounded() / 1_000
+        }
+    }
+
     private func detect(_ text: String) -> TextLanguage {
         guard text.filter(\.isLetter).count >= 4 else { return .unknown }
         recognizer.reset()

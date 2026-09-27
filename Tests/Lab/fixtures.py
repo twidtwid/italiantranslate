@@ -25,6 +25,7 @@ SHOTS = {
     "page": None,
     "top": (0.5, 0.25),
     "middle": (0.5, 0.6),
+    "page4k": None,  # the whole page again at 3840x2160, to see what a sharper capture buys
 }
 
 
@@ -69,7 +70,7 @@ def halves(page):
     return [page[:, : width // 2], page[:, width // 2 :]]
 
 
-def table(rng):
+def table(rng, W, H):
     """Dark wood under the menu."""
     base = np.array([34, 52, 78], dtype=np.float32)  # BGR
     grain = cv2.resize(rng.normal(0, 1, (H // 8, 24)).astype(np.float32), (W, H), interpolation=cv2.INTER_CUBIC)
@@ -79,6 +80,8 @@ def table(rng):
 
 def shoot(page, shot, seed):
     rng = np.random.default_rng(seed)
+    factor = 2 if shot.endswith("4k") else 1
+    W, H = globals()["W"] * factor, globals()["H"] * factor
     height, width = page.shape[:2]
     if SHOTS[shot] is None:
         scale, cx, cy = 0.92 * W / width, 0.5, 0.5
@@ -101,7 +104,7 @@ def shoot(page, shot, seed):
     paper = page.astype(np.float32) * np.array([0.93, 0.95, 0.97], dtype=np.float32)  # not quite white
     warped = cv2.warpPerspective(paper, matrix, (W, H), flags=cv2.INTER_AREA, borderValue=(0, 0, 0))
     mask = cv2.warpPerspective(np.ones((height, width), np.float32), matrix, (W, H), flags=cv2.INTER_LINEAR)
-    frame = warped * mask[..., None] + table(rng) * (1 - mask[..., None])
+    frame = warped * mask[..., None] + table(rng, W, H) * (1 - mask[..., None])
 
     # Restaurant light: warm, falling off across the page, darker corners.
     ys, xs = np.mgrid[0:H, 0:W].astype(np.float32)
@@ -110,7 +113,7 @@ def shoot(page, shot, seed):
     light = 0.86 + 0.16 * ramp - 0.18 * (((xs / W - 0.5) ** 2 + (ys / H - 0.5) ** 2) * 2)
     frame = frame * light[..., None] * np.array([0.84, 0.94, 1.0], dtype=np.float32)
 
-    frame = cv2.GaussianBlur(frame, (0, 0), 0.9 if shot == "page" else 1.2)
+    frame = cv2.GaussianBlur(frame, (0, 0), (0.9 if shot.startswith("page") else 1.2) * factor)
     frame = frame + rng.normal(0, 3.0, frame.shape).astype(np.float32)
     return np.clip(frame, 0, 255).astype(np.uint8)
 
@@ -129,7 +132,7 @@ def main():
         for number, page in enumerate(pages, start=1):
             for shot in entry.get("shots", list(SHOTS)):
                 name = f"{entry['name']}-p{number}-{shot}"
-                seed = random.Random(name).randrange(2**32)
+                seed = random.Random(name.replace("page4k", "page")).randrange(2**32)  # same framing
                 cv2.imwrite(str(out / f"{name}.jpg"), shoot(page, shot, seed), [cv2.IMWRITE_JPEG_QUALITY, 88])
                 made.append(name)
     print(f"{len(made)} frames: " + ", ".join(made))

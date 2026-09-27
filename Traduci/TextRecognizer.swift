@@ -12,15 +12,16 @@ final class TextRecognizer {
         return languages.contains { $0.hasPrefix("it") }
     }()
 
-    private let request: VNRecognizeTextRequest = {
-        let request = VNRecognizeTextRequest()
+    private let request: VNRecognizeTextRequest
+
+    /// `minimumTextHeight` is a fraction of the image height. Vision's default, 1/32, misses menu
+    /// text with a whole page in view; smaller catches tinier text but costs OCR time.
+    init(minimumTextHeight: Float = 1.0 / 64.0) {
+        request = VNRecognizeTextRequest()
         request.recognitionLanguages = ["it-IT"]
         request.automaticallyDetectsLanguage = false
-        // Default is 1/32 of the frame height, which misses menu text with a whole page in view.
-        // Smaller catches tinier text but costs OCR time.
-        request.minimumTextHeight = 1.0 / 64.0
-        return request
-    }()
+        request.minimumTextHeight = minimumTextHeight
+    }
 
     func lines(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation, fast: Bool) -> [OCRLine] {
         recognize(VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation, options: [:]), fast: fast)
