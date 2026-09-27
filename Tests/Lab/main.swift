@@ -15,9 +15,8 @@ let output = URL(fileURLWithPath: arguments[2])
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
 let recognizer = TextRecognizer()
-let fineRecognizer = TextRecognizer(minimumTextHeight: 0) // does finer OCR find the small print?
 let languages = LanguageDetector()
-var comparison = "| frame | lines 1/64 | lines 0 | prices 1/64 | prices 0 | ms 1/64 | ms 0 |\n|---|---|---|---|---|---|---|\n"
+var comparison = "Lines / price lines / ms, reading the whole frame vs in 2, 3, 4 bands.\n\n| frame | whole | 2 bands | 3 bands | 4 bands |\n|---|---|---|---|---|\n"
 
 /// Price-like lines ("€ 12", "11,00", "EURO 8"): the small print a whole-page shot tends to lose.
 func priceCount(_ lines: [OCRLine]) -> Int {
@@ -48,10 +47,16 @@ for url in frames(in: input) {
     let fastLines = recognizer.lines(in: image, orientation: .up, fast: true)
     let fastMs = Date().timeIntervalSince(started) * 1000
 
-    started = Date()
-    let fineLines = fineRecognizer.lines(in: image, orientation: .up, fast: false)
-    let fineMs = Date().timeIntervalSince(started) * 1000
-    comparison += "| \(frame) | \(lines.count) | \(fineLines.count) | \(priceCount(lines)) | \(priceCount(fineLines)) | \(Int(accurateMs)) | \(Int(fineMs)) |\n"
+    var row = "| \(frame) | \(lines.count) / \(priceCount(lines)) / \(Int(accurateMs))"
+    var tiled: [Int: [OCRLine]] = [:]
+    for bands in [2, 3, 4] {
+        started = Date()
+        let banded = recognizer.lines(in: image, fast: false, bands: bands)
+        row += " | \(banded.count) / \(priceCount(banded)) / \(Int(Date().timeIntervalSince(started) * 1000))"
+        tiled[bands] = banded
+    }
+    comparison += row + " |\n"
+    let fineLines = tiled[3] ?? lines
 
     let blocks = TextBlockBuilder.blocks(from: lines, aspect: aspect, language: languages.language(of:))
 
@@ -62,7 +67,7 @@ for url in frames(in: input) {
         "ocrMs": Int(accurateMs),
         "fastOcrMs": Int(fastMs),
         "fastLineCount": fastLines.count,
-        "fineLines": fineLines.map { line in
+        "bandedLines": fineLines.map { line in
             [
                 "text": line.text,
                 "box": numbers(line.box),
@@ -116,4 +121,4 @@ for url in frames(in: input) {
 }
 
 try summary.write(to: output.appendingPathComponent("summary.md"), atomically: true, encoding: .utf8)
-try comparison.write(to: output.appendingPathComponent("fine-ocr.md"), atomically: true, encoding: .utf8)
+try comparison.write(to: output.appendingPathComponent("bands.md"), atomically: true, encoding: .utf8)

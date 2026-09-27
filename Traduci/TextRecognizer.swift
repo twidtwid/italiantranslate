@@ -31,6 +31,21 @@ final class TextRecognizer {
         recognize(VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:]), fast: fast)
     }
 
+    /// Reads only `region` (normalized, origin top-left) of an upright image. Vision reads at a fixed
+    /// working resolution, so a smaller region is a closer look: the small print of a whole-page
+    /// shot (prices, allergens) comes out. Lines come back in whole-image coordinates.
+    func lines(in image: CGImage, fast: Bool, region: CGRect) -> [OCRLine] {
+        request.regionOfInterest = CGRect(x: region.minX, y: 1 - region.maxY, width: region.width, height: region.height)
+        defer { request.regionOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1) }
+        return recognize(VNImageRequestHandler(cgImage: image, orientation: .up, options: [:]), fast: fast)
+            .map { $0.mapped(from: region) }
+    }
+
+    /// The whole image in overlapping bands, each line once.
+    func lines(in image: CGImage, fast: Bool, bands: Int) -> [OCRLine] {
+        OCRTiles.merge(OCRTiles.bands(bands).map { lines(in: image, fast: fast, region: $0) })
+    }
+
     private func recognize(_ handler: VNImageRequestHandler, fast: Bool) -> [OCRLine] {
         let useFast = fast && Self.fastModeAvailable
         request.recognitionLevel = useFast ? .fast : .accurate
