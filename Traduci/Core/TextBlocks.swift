@@ -17,34 +17,71 @@ struct TextBlock: Equatable {
 }
 
 enum TextBlockBuilder {
-    /// Merges lines only when they read as one sentence (paragraphs, two-line signs).
-    /// Everything else — menu items, labels, prices — stays one line per block so each
-    /// translation lands on top of the text it belongs to.
-    static func blocks(from lines: [OCRLine]) -> [TextBlock] {
-        let lines = lines
+    /// Groups OCR lines into translation units. Pieces of one printed line are glued back together;
+    /// lines merge only when they read as one sentence in the same language (paragraphs, two-line
+    /// signs). Everything else (menu items, labels, prices) stays one line per block, so each
+    /// translation lands on the text it belongs to. English is dropped: bilingual menus print it
+    /// right under the Italian, and it needs no translating.
+    /// - Parameter aspect: upright frame height ÷ width, to compare horizontal and vertical distances.
+    static func blocks(from lines: [OCRLine], aspect: CGFloat = 16.0 / 9.0,
+                       language: (String) -> TextLanguage = { _ in .unknown }) -> [TextBlock] {
+        let cleaned = lines
             .map { OCRLine(text: TextNormalizer.collapseWhitespace($0.text), box: $0.box) }
             .filter { !$0.text.isEmpty && $0.box.width > 0 && $0.box.height > 0 }
+        let rows = joinRows(cleaned, aspect: aspect, language: language)
             .sorted { ($0.box.minY, $0.box.minX) < ($1.box.minY, $1.box.minX) }
 
         var groups: [[OCRLine]] = []
-        for line in lines {
+        for row in rows {
             var best: Int?
             var bestGap = CGFloat.greatestFiniteMagnitude
             for index in groups.indices {
-                guard let last = groups[index].last, continues(last, line) else { continue }
-                let gap = line.box.minY - last.box.maxY
+                guard let last = groups[index].last, continues(last, row),
+                      compatible(language(last.text), language(row.text)) else { continue }
+                let gap = row.box.minY - last.box.maxY
                 if gap < bestGap {
                     best = index
                     bestGap = gap
                 }
             }
             if let best {
-                groups[best].append(line)
+                groups[best].append(row)
             } else {
-                groups.append([line])
+                groups.append([row])
             }
         }
-        return groups.compactMap(block(from:))
+        return groups.compactMap { block(from: $0, language: language) }
+    }
+
+    /// Vision sometimes splits one printed line in two (a wide gap, a change of font). Glue
+    /// side-by-side pieces of the same line back together, left to right. Two columns in two
+    /// languages (Italian | English) stay apart.
+    static func joinRows(_ lines: [OCRLine], aspect: CGFloat, language: (String) -> TextLanguage) -> [OCRLine] {
+        var rows: [OCRLine] = []
+        for line in lines.sorted(by: { $0.box.minX < $1.box.minX }) {
+            let match = rows.firstIndex { sameRow($0, line, aspect: aspect) && compatible(language($0.text), language(line.text)) }
+            if let match {
+                rows[match] = OCRLine(text: rows[match].text + " " + line.text, box: rows[match].box.union(line.box))
+            } else {
+                rows.append(line)
+            }
+        }
+        return rows
+    }
+
+    /// `right` continues `left` on the same printed line, after at most about a word's gap.
+    static func sameRow(_ left: OCRLine, _ right: OCRLine, aspect: CGFloat) -> Bool {
+        let a = left.box, b = right.box
+        let small = min(a.height, b.height), large = max(a.height, b.height)
+        guard small > 0, large <= small * 1.4 else { return false }
+        guard min(a.maxY, b.maxY) - max(a.minY, b.minY) >= small * 0.6 else { return false }
+        let lineHeightInWidths = small * aspect // x is normalized to width, y to height
+        let gap = b.minX - a.maxX
+        return gap > -lineHeightInWidths && gap < lineHeightInWidths * 1.2
+    }
+
+    static func compatible(_ a: TextLanguage, _ b: TextLanguage) -> Bool {
+        a == b || a == .unknown || b == .unknown
     }
 
     /// `next` sits right under `line`, in the same column, at the same size, and reads as its continuation.
@@ -69,13 +106,13 @@ enum TextBlockBuilder {
         return text + " " + next
     }
 
-    private static func block(from lines: [OCRLine]) -> TextBlock? {
+    private static func block(from lines: [OCRLine], language: (String) -> TextLanguage) -> TextBlock? {
         guard var text = lines.first?.text, var box = lines.first?.box else { return nil }
         for line in lines.dropFirst() {
             text = join(text, line.text)
             box = box.union(line.box)
         }
-        guard TextNormalizer.isWorthTranslating(text) else { return nil }
+        guard TextNormalizer.isWorthTranslating(text), language(text) != .english else { return nil }
         return TextBlock(text: text, box: box, lineCount: lines.count)
     }
 }

@@ -4,41 +4,62 @@ import CoreGraphics
 #endif
 
 /// Maps normalized image coordinates to a view showing that image aspect-filled and centered —
-/// the same geometry as `AVLayerVideoGravity.resizeAspectFill` and SwiftUI's `scaledToFill()`.
+/// the same geometry as `AVLayerVideoGravity.resizeAspectFill` and SwiftUI's `scaledToFill()` —
+/// optionally magnified and panned (pinch-zooming a locked still).
 struct AspectFillMapper {
     var imageSize: CGSize
     var viewSize: CGSize
+    /// Magnification on top of aspect-fill.
+    var zoom: CGFloat = 1
+    /// Offset in points; clamped so the image always covers the view.
+    var pan: CGSize = .zero
 
-    private var displayedSize: CGSize {
+    var displayedSize: CGSize {
         guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
-        let scale = max(viewSize.width / imageSize.width, viewSize.height / imageSize.height)
+        let scale = max(viewSize.width / imageSize.width, viewSize.height / imageSize.height) * max(zoom, 1)
         return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
     }
 
-    private var origin: CGPoint {
-        CGPoint(x: (viewSize.width - displayedSize.width) / 2, y: (viewSize.height - displayedSize.height) / 2)
+    /// Where the whole image sits in view coordinates.
+    var imageFrame: CGRect {
+        let size = displayedSize
+        let offset = clamped(pan)
+        return CGRect(
+            x: (viewSize.width - size.width) / 2 + offset.width,
+            y: (viewSize.height - size.height) / 2 + offset.height,
+            width: size.width,
+            height: size.height
+        )
     }
 
     func viewRect(for normalized: CGRect) -> CGRect {
-        let size = displayedSize
+        let frame = imageFrame
         return CGRect(
-            x: origin.x + normalized.minX * size.width,
-            y: origin.y + normalized.minY * size.height,
-            width: normalized.width * size.width,
-            height: normalized.height * size.height
+            x: frame.minX + normalized.minX * frame.width,
+            y: frame.minY + normalized.minY * frame.height,
+            width: normalized.width * frame.width,
+            height: normalized.height * frame.height
         )
     }
 
     /// The part of the image that is actually on screen, in normalized image coordinates.
     var visibleRect: CGRect {
-        let size = displayedSize
+        let frame = imageFrame
         let whole = CGRect(x: 0, y: 0, width: 1, height: 1)
-        guard size.width > 0, size.height > 0 else { return whole }
+        guard frame.width > 0, frame.height > 0 else { return whole }
         return CGRect(
-            x: -origin.x / size.width,
-            y: -origin.y / size.height,
-            width: viewSize.width / size.width,
-            height: viewSize.height / size.height
+            x: -frame.minX / frame.width,
+            y: -frame.minY / frame.height,
+            width: viewSize.width / frame.width,
+            height: viewSize.height / frame.height
         ).intersection(whole)
+    }
+
+    /// The nearest pan that keeps the image covering the whole view.
+    func clamped(_ pan: CGSize) -> CGSize {
+        let size = displayedSize
+        let maxX = max(0, (size.width - viewSize.width) / 2)
+        let maxY = max(0, (size.height - viewSize.height) / 2)
+        return CGSize(width: min(max(pan.width, -maxX), maxX), height: min(max(pan.height, -maxY), maxY))
     }
 }

@@ -3,7 +3,8 @@
 Point your iPhone at Italian and read English. Traduci opens straight into the camera and paints English over the Italian as you move.
 
 - **Fully offline.** Apple's Vision reads the text and Apple's Translation framework translates it, both on the device. After a one-time download of the Italian language pack, it works in airplane mode.
-- **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. Only text that's on screen right now gets translated, starting with whatever is nearest the centre. Every result is cached, and the translation model is loaded before the first text shows up.
+- **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. While you aim, the text nearest the centre is translated ahead, so it's ready the moment you hold still. Every result is cached, and the translation model is loaded before the first text shows up.
+- **Calm to read.** Translations are laid over a locked, sharp frame instead of chasing a shaking camera, the same way Apple's Translate app freezes the frame and Google Translate uses Scan mode for menus.
 
 ## Install with TestFlight (no Mac)
 
@@ -39,23 +40,32 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 
 ## Using it
 
+**Aim, then read.**
+- **Aim:** point the phone at Italian. The camera stays clean while you move, and translation is already running in the background.
+- **Read:** hold still for a moment. Traduci locks a sharp frame, gives a light tap, and lays the English over the Italian in the page's own paper and ink colours. Nothing moves while you read.
+- **Move on:** turn to the next part of the menu and it goes back to aiming by itself, then locks again when you're steady.
+
 | | |
 |---|---|
-| Point at text | English covers the Italian it translates |
-| ⏸ (centre button) | Freezes the frame; tap any translation to read it full size, next to the original |
+| Pinch the locked frame | Zoom into small print; drag to look around |
+| Tap a translation | Read it full size, next to the original |
+| Centre button | Lock now, or go back to the camera |
 | Flashlight | Torch, for dark restaurants |
-| Pinch / `1×` button | Zoom for far-away signs. The button cycles 1× → 2× → 5× (telephoto) |
-| `Accurate` / `Fast` chip | Switches OCR modes. Fast wins on big clean signs, Accurate wins on menus and small print |
+| Pinch while aiming / `1×` button | Camera zoom. The button cycles 1× → 2× → 5× (telephoto) |
+| `Accurate` / `Fast` chip | OCR mode. Fast suits big clean signs; Accurate suits menus and small print |
 | Top-left pill | Status, plus the latest OCR and translation (MT) times in ms |
 
-The phone switches to the ultra-wide lens by itself for close-up (macro) text. Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
+- English that's already printed on bilingual menus is left alone; only the Italian gets translated.
+- The phone switches to the ultra-wide lens by itself for close-up (macro) text.
+- Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
 
 ## How it works
 
 ```
-camera (1080p) ──► Vision OCR, it-IT ──► lines → blocks ──► overlay tracker ──► SwiftUI overlays
-                   newest frame only      paragraphs join,    stable positions,          ▲
-                                          menu lines don't    centre-first queue ──► Translation (on-device, cached)
+aiming:  camera ─► Vision OCR (it-IT) ─► lines → blocks ─► drop English ─► translate ahead, centre first (cached)
+                   newest frame only      paragraphs join,
+                                          menu lines don't
+reading: gyro says "still" ─► sharp frame ─► English painted in the page's paper and ink colours ─► pinch, tap
 ```
 
 | File | Role |
@@ -63,7 +73,8 @@ camera (1080p) ──► Vision OCR, it-IT ──► lines → blocks ──► 
 | `Traduci/CameraController.swift` | Capture session, frame dropping, freeze, torch, zoom |
 | `Traduci/TextRecognizer.swift` | Vision OCR settings (`minimumTextHeight` trades small text against speed) |
 | `Traduci/TranslationEngine.swift` | On-device translation queue, cache, warm-up, self-healing session |
-| `Traduci/Core/` | Camera-free logic: line grouping, overlay tracking, screen mapping |
+| `Traduci/AppModel.swift`, `Traduci/MotionMonitor.swift` | Aim-and-read: when to lock a still and when to aim again |
+| `Traduci/Core/` | Camera-free logic: line grouping, language detection, page colours, screen mapping |
 | `Tests/CoreTests/main.swift` | Tests for `Core/`, run by CI |
 | `.github/workflows/ios.yml` | Every push: core tests plus an iOS build with Xcode 26 and Xcode 27 |
 | `.github/workflows/testflight.yml`, `scripts/asc_preflight.py` | On demand: check the Apple setup, then archive, cloud-sign and upload to TestFlight |

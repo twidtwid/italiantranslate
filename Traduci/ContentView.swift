@@ -3,8 +3,9 @@ import Translation
 
 struct ContentView: View {
     @State private var model = AppModel()
-    @State private var selectedItem: OverlayItem?
-    @State private var zoomAtPinchStart: CGFloat?
+    @State private var selectedCaption: Caption?
+    @State private var cameraZoomAtPinchStart: CGFloat?
+    @State private var stillAtGestureStart: (zoom: CGFloat, pan: CGSize)?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -33,35 +34,76 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.didEnterBackground() }
         }
-        .sheet(item: $selectedItem) { item in
-            TranslationDetail(item: item)
+        .onChange(of: selectedCaption) { _, caption in
+            model.isShowingDetail = caption != nil
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: model.mode) { _, mode in mode == .reading }
+        .sheet(item: $selectedCaption) { caption in
+            TranslationDetail(caption: caption)
         }
     }
 
     private var viewfinder: some View {
         GeometryReader { geometry in
+            let mapper = AspectFillMapper(imageSize: model.imageSize, viewSize: geometry.size, zoom: model.stillZoom, pan: model.stillPan)
             ZStack {
                 CameraPreview(session: model.camera.session)
-                if let frozen = model.frozenImage {
-                    Image(decorative: frozen, scale: 1)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
+                if let still = model.stillImage {
+                    let frame = mapper.imageFrame
+                    ZStack {
+                        Image(decorative: still, scale: 1)
+                            .resizable()
+                            .frame(width: frame.width, height: frame.height)
+                            .position(x: frame.midX, y: frame.midY)
+                        ReadingLayer(captions: model.captions, mapper: mapper) { selectedCaption = $0 }
+                    }
+                    .transition(.opacity)
                 }
-                OverlayLayer(
-                    items: model.items,
-                    mapper: AspectFillMapper(imageSize: model.imageSize, viewSize: geometry.size),
-                    onSelect: { selectedItem = $0 }
-                )
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+            .contentShape(Rectangle())
+            .animation(.easeOut(duration: 0.18), value: model.mode)
+            .gesture(pinch)
+            .simultaneousGesture(pan)
             .onChange(of: geometry.size, initial: true) { _, size in
                 model.viewSize = size
             }
         }
         .ignoresSafeArea()
-        .gesture(pinchToZoom)
+    }
+
+    /// Aiming: camera zoom. Reading: magnify the still.
+    private var pinch: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                if model.mode == .reading {
+                    let start = stillAtGestureStart ?? (zoom: model.stillZoom, pan: model.stillPan)
+                    stillAtGestureStart = start
+                    model.zoomStill(to: start.zoom * value.magnification, from: start)
+                } else {
+                    let start = cameraZoomAtPinchStart ?? model.zoom
+                    cameraZoomAtPinchStart = start
+                    model.setZoom(start * value.magnification)
+                }
+            }
+            .onEnded { _ in
+                cameraZoomAtPinchStart = nil
+                stillAtGestureStart = nil
+            }
+    }
+
+    /// Reading a magnified still: drag it around.
+    private var pan: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                guard model.mode == .reading, model.stillZoom > 1 else { return }
+                let start = stillAtGestureStart ?? (zoom: model.stillZoom, pan: model.stillPan)
+                stillAtGestureStart = start
+                model.panStill(to: CGSize(width: start.pan.width + value.translation.width,
+                                          height: start.pan.height + value.translation.height))
+            }
+            .onEnded { _ in stillAtGestureStart = nil }
     }
 
     private var zoomLabel: String {
@@ -69,15 +111,10 @@ struct ContentView: View {
         return abs(model.zoom - whole) < 0.05 ? "\(Int(whole))×" : String(format: "%.1f×", Double(model.zoom))
     }
 
-    private var pinchToZoom: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                guard !model.isFrozen else { return }
-                let start = zoomAtPinchStart ?? model.zoom
-                zoomAtPinchStart = start
-                model.setZoom(start * value.magnification)
-            }
-            .onEnded { _ in zoomAtPinchStart = nil }
+    private var hint: String? {
+        guard model.mode == .aiming, model.cameraState == .running else { return nil }
+        if model.isLocking { return "Reading…" }
+        return model.textInView ? "Hold steady to translate" : "Point at Italian text"
     }
 
     private var controls: some View {
@@ -85,7 +122,7 @@ struct ContentView: View {
             HStack(alignment: .top) {
                 StatusPill(engine: model.engine, ocrMilliseconds: model.ocrMilliseconds)
                 Spacer(minLength: 12)
-                if model.fastOCRAvailable {
+                if model.fastOCRAvailable, model.mode == .aiming {
                     Button {
                         model.toggleFastOCR()
                     } label: {
@@ -104,35 +141,45 @@ struct ContentView: View {
 
             Spacer()
 
-            if model.isFrozen {
-                Text("Frozen · tap a translation to read it in full")
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+            if let hint {
+                Label(hint, systemImage: "text.viewfinder")
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 16)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: hint)
             }
 
             HStack {
-                RoundButton(
-                    systemImage: model.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
-                    label: model.torchOn ? "Torch off" : "Torch on",
-                    action: { model.toggleTorch() }
-                )
-                Spacer()
-                FreezeButton(isFrozen: model.isFrozen || model.isFreezePending) { model.toggleFreeze() }
-                Spacer()
-                Button {
-                    model.cycleZoom()
-                } label: {
-                    Text(zoomLabel)
-                        .font(.footnote.weight(.bold).monospacedDigit())
-                        .frame(width: 52, height: 52)
-                        .background(.ultraThinMaterial, in: Circle())
+                if model.mode == .aiming {
+                    RoundButton(
+                        systemImage: model.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
+                        label: model.torchOn ? "Torch off" : "Torch on",
+                        action: { model.toggleTorch() }
+                    )
+                } else {
+                    Color.clear.frame(width: 52, height: 52)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Zoom \(zoomLabel)")
-                .accessibilityHint("Switches to the next lens")
+                Spacer()
+                LockButton(isReading: model.mode == .reading || model.isLocking) { model.toggleLock() }
+                Spacer()
+                if model.mode == .aiming {
+                    Button {
+                        model.cycleZoom()
+                    } label: {
+                        Text(zoomLabel)
+                            .font(.footnote.weight(.bold).monospacedDigit())
+                            .frame(width: 52, height: 52)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Zoom \(zoomLabel)")
+                    .accessibilityHint("Switches to the next lens")
+                } else {
+                    Color.clear.frame(width: 52, height: 52)
+                }
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 16)
@@ -210,8 +257,9 @@ private struct RoundButton: View {
     }
 }
 
-private struct FreezeButton: View {
-    let isFrozen: Bool
+/// Read what's in view now, or go back to aiming. Holding still does the same by itself.
+private struct LockButton: View {
+    let isReading: Bool
     let action: () -> Void
 
     var body: some View {
@@ -219,13 +267,14 @@ private struct FreezeButton: View {
             ZStack {
                 Circle().stroke(Color.white, lineWidth: 4).frame(width: 76, height: 76)
                 Circle().fill(Color.white).frame(width: 62, height: 62)
-                Image(systemName: isFrozen ? "play.fill" : "pause.fill")
+                Image(systemName: isReading ? "camera.fill" : "text.viewfinder")
                     .font(.title2)
                     .foregroundStyle(.black)
+                    .contentTransition(.symbolEffect(.replace))
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isFrozen ? "Resume live translation" : "Freeze frame")
+        .accessibilityLabel(isReading ? "Back to the camera" : "Translate what's in view")
     }
 }
 
