@@ -3,7 +3,9 @@ name: TestFlight
 # Builds, signs (Apple cloud signing, no certificates to manage) and uploads to TestFlight.
 # Setup: README.md → "Install with TestFlight".
 on:
-  workflow_dispatch:
+  workflow_dispatch: # the Run button shows up once this file is on main
+  push:
+    tags: ["testflight-*"] # or push a tag like testflight-2 from any branch
 
 concurrency:
   group: testflight

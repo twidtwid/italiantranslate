@@ -18,7 +18,7 @@ GitHub's Mac runners build the app, Apple's cloud signing signs it, and it's upl
    - `ASC_PRIVATE_KEY`: the whole `.p8` file, including the `BEGIN`/`END` lines.
 
    Put the key straight into GitHub; don't paste it anywhere else.
-4. **Run the TestFlight workflow** (**Actions → TestFlight → Run workflow**; the button appears once this code is on `main`). The first run registers the bundle ID `com.twidtwid.Traduci`, then stops and asks for the app record, which Apple only allows creating on the web. In App Store Connect, go to **Apps → + → New App**, choose iOS, and give it any unique name, e.g. "Traduci Live" (the home-screen name stays "Traduci"). Pick that bundle ID and any SKU. Run the workflow again and it archives, signs and uploads in about 5 minutes.
+4. **Run the TestFlight workflow**: use **Actions → TestFlight → Run workflow** (the button appears once this code is on `main`), or push a tag named `testflight-<anything>` from any branch. The first run registers the bundle ID `com.twidtwid.Traduci`, then stops and asks for the app record, which Apple only allows creating on the web. In App Store Connect, go to **Apps → + → New App**, choose iOS, and give it any unique name, e.g. "Traduci Live" (the home-screen name stays "Traduci"). Pick that bundle ID and any SKU. Run the workflow again and it archives, signs and uploads in about 5 minutes.
 5. **TestFlight.** In App Store Connect, open your app, then **TestFlight → Internal Testing → +**. Add yourself and turn on automatic distribution. Install the TestFlight app on the iPhone. Each build appears there 5 to 15 minutes after upload, and builds last 90 days.
 
 To use a different bundle ID, set a repository **variable** named `BUNDLE_ID`.
