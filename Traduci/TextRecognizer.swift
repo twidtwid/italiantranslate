@@ -23,10 +23,17 @@ final class TextRecognizer {
     }()
 
     func lines(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation, fast: Bool) -> [OCRLine] {
+        recognize(VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation, options: [:]), fast: fast)
+    }
+
+    func lines(in image: CGImage, orientation: CGImagePropertyOrientation, fast: Bool) -> [OCRLine] {
+        recognize(VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:]), fast: fast)
+    }
+
+    private func recognize(_ handler: VNImageRequestHandler, fast: Bool) -> [OCRLine] {
         let useFast = fast && Self.fastModeAvailable
         request.recognitionLevel = useFast ? .fast : .accurate
         request.usesLanguageCorrection = !useFast
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation, options: [:])
         do {
             try handler.perform([request])
         } catch {

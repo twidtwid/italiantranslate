@@ -31,15 +31,50 @@ struct Caption: Identifiable, Equatable {
 }
 
 enum Captions {
-    /// While reading, the phone has moved on to other text: most of the locked captions are gone
-    /// from a fresh look at the camera. A frame with barely any text (a glance away, motion blur)
-    /// proves nothing, so it never unlocks on its own.
-    static func sceneChanged(from captions: [Caption], to blocks: [TextBlock]) -> Bool {
-        guard !captions.isEmpty, blocks.count >= 2 else { return false }
-        let found = captions.filter { caption in
-            blocks.contains { TextNormalizer.similarity($0.text, caption.source) >= 0.75 }
-        }.count
-        return Double(found) < Double(captions.count) * 0.4
+    /// Columns left to right, then top to bottom within each: the order people read a menu or a
+    /// notice in. Columns are found from the gutters no ordinary line crosses; a heading wide
+    /// enough to span columns joins the column nearest its middle.
+    static func readingOrder(_ captions: [Caption]) -> [Caption] {
+        var columns: [(minX: CGFloat, maxX: CGFloat)] = []
+        for box in captions.map(\.box).filter({ $0.width < 0.6 }).sorted(by: { $0.minX < $1.minX }) {
+            if let last = columns.last, box.minX <= last.maxX + 0.02 {
+                columns[columns.count - 1].maxX = max(last.maxX, box.maxX)
+            } else {
+                columns.append((box.minX, box.maxX))
+            }
+        }
+        func column(_ caption: Caption) -> Int {
+            let x = caption.box.midX
+            return columns.indices.min { distance(x, columns[$0]) < distance(x, columns[$1]) } ?? 0
+        }
+        func distance(_ x: CGFloat, _ column: (minX: CGFloat, maxX: CGFloat)) -> CGFloat {
+            x < column.minX ? column.minX - x : (x > column.maxX ? x - column.maxX : 0)
+        }
+        return captions.sorted { (column($0), $0.box.minY) < (column($1), $1.box.minY) }
+    }
+
+    /// Two looks in a row show the same text in about the same place: the view is steady enough to
+    /// read, whatever the motion sensors think. `aspect` is frame height ÷ width.
+    static func sameView(_ previous: [TextBlock], _ current: [TextBlock], aspect: CGFloat = 16.0 / 9.0) -> Bool {
+        guard !previous.isEmpty, !current.isEmpty else { return false }
+        var shifts: [CGFloat] = [] // how far each matched block moved, in its own line heights
+        for block in current {
+            var best: TextBlock?
+            var bestSimilarity = 0.8 // must be at least this alike to count as the same text
+            for candidate in previous {
+                let similarity = TextNormalizer.similarity(candidate.text, block.text)
+                if similarity >= bestSimilarity {
+                    best = candidate
+                    bestSimilarity = similarity
+                }
+            }
+            guard let match = best else { continue }
+            let lineHeight = max(block.box.height / CGFloat(max(block.lineCount, 1)), 0.001)
+            let dx = (match.box.midX - block.box.midX) / aspect, dy = match.box.midY - block.box.midY
+            shifts.append((dx * dx + dy * dy).squareRoot() / lineHeight)
+        }
+        guard shifts.count * 5 >= current.count * 3 else { return false } // most of the text is the same
+        return shifts.sorted()[shifts.count / 2] < 0.6
     }
 
     /// Distinct texts, most central first: the translator's work queue.

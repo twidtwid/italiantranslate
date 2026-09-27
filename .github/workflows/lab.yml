@@ -1,0 +1,53 @@
+name: Menu lab
+
+# Real Italian menus through the app's own OCR and grouping on a Mac, with Vision's document reader
+# alongside for comparison. Results go to the "lab" draft release (visible to collaborators only).
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["Tests/Lab/**", "Traduci/**", ".github/workflows/lab.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # the draft release that holds the results
+
+concurrency:
+  group: lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lab:
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      LAB: ${{ github.workspace }}/lab-results
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Camera frames from the menus
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pymupdf==1.28.2 numpy==2.4.6 opencv-python-headless==5.0.0.93
+          "$RUNNER_TEMP/venv/bin/python" Tests/Lab/fixtures.py Tests/Lab/menus.json "$LAB/frames"
+
+      - name: App OCR and grouping
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
+          "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
+
+      - name: Vision document reader
+        continue-on-error: true
+        run: |
+          xcrun swiftc -O -target arm64-apple-macos26.0 Tests/Lab/Common.swift Tests/Lab/Documents/main.swift -o "$RUNNER_TEMP/lab-documents"
+          "$RUNNER_TEMP/lab-documents" "$LAB/frames" "$LAB/documents"
+
+      - name: Publish results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "${{ github.sha }}" > "$LAB/commit.txt"
+          (cd "$LAB" && zip -qr "$RUNNER_TEMP/lab-results.zip" .)
+          gh release view lab >/dev/null 2>&1 || gh release create lab --draft --title "Menu lab" --notes "Scratch results from the menu lab workflow. Not a release."
+          gh release upload lab "$RUNNER_TEMP/lab-results.zip" --clobber
+          ls -la "$RUNNER_TEMP/lab-results.zip"

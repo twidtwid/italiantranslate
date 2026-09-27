@@ -20,8 +20,8 @@ enum TextBlockBuilder {
     /// Groups OCR lines into translation units. Pieces of one printed line are glued back together;
     /// lines merge only when they read as one sentence in the same language (paragraphs, two-line
     /// signs). Everything else (menu items, labels, prices) stays one line per block, so each
-    /// translation lands on the text it belongs to. English is dropped: bilingual menus print it
-    /// right under the Italian, and it needs no translating.
+    /// translation lands on the text it belongs to. Other languages are dropped: multilingual menus
+    /// and notices print English, French or German beside the Italian, and it needs no translating.
     /// - Parameter aspect: upright frame height ÷ width, to compare horizontal and vertical distances.
     static func blocks(from lines: [OCRLine], aspect: CGFloat = 16.0 / 9.0,
                        language: (String) -> TextLanguage = { _ in .unknown }) -> [TextBlock] {
@@ -112,7 +112,7 @@ enum TextBlockBuilder {
             text = join(text, line.text)
             box = box.union(line.box)
         }
-        guard TextNormalizer.isWorthTranslating(text), language(text) != .english else { return nil }
+        guard TextNormalizer.isWorthTranslating(text), language(text) != .foreign else { return nil }
         return TextBlock(text: text, box: box, lineCount: lines.count)
     }
 }

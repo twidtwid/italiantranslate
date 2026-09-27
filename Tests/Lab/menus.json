@@ -1,0 +1,18 @@
+[
+  {"name": "nerocarbone", "file": "Tests/Lab/nerocarbone.png",
+   "about": "From a TestFlight report: dishes on the left, EURO prices at a ragged tab stop, caps headings"},
+  {"name": "sanpastore", "url": "https://quandoo-assets-partner.s3-eu-west-1.amazonaws.com/partner/uploads/f910ca3f-6a95-4f63-bbf8-e92e1ffc9462/MD-document-d006190b-ebd3-493d-839c-e9eec42f7f55.pdf",
+   "about": "Centred italic, the price on the line under each dish, script headings, two pages side by side"},
+  {"name": "casale", "url": "https://podereilcasale.com/wp-content/uploads/2017/09/Menu-ITA_sept.pdf",
+   "about": "Farm restaurant, dishes with descriptions"},
+  {"name": "daluigi", "url": "https://www.ristorantedaluigi.it/menu.pdf",
+   "about": "Trattoria, grill"},
+  {"name": "corniolo", "url": "https://www.ristoranteilcorniolo.it/wp/wp-content/uploads/2020/07/Men%C3%B9A3luglio.pdf",
+   "about": "Italian with the English under each dish, 13,00 € prices"},
+  {"name": "piccadilly", "url": "https://www.hotelpiccadillyroma.it/Portals/125/Men%C3%B9%20Da%20Roberto%20e%20Loretta.pdf",
+   "about": "Roman trattoria, Italian dish with English description"},
+  {"name": "casadelconte", "url": "https://www.ristorantecasadelconte.it/wp-content/uploads/2024/04/menu-ristorante-casa-del-conte-maggio.pdf",
+   "about": "Modern menu, allergen numbers"},
+  {"name": "indigo", "url": "https://digital.ihg.com/is/content/ihg/hotel-indigo-florence-10799815456-original?fmt=pdf",
+   "about": "Hotel restaurant in Florence, bilingual sections"}
+]

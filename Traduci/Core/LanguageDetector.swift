@@ -2,13 +2,18 @@ import Foundation
 import NaturalLanguage
 
 enum TextLanguage {
-    case italian, english, unknown
+    /// Italian: translate it.
+    case italian
+    /// Clearly another language (English, French, German, Spanish): multilingual menus and notices
+    /// print these beside the Italian, and they must not be "translated" as if they were Italian.
+    case foreign
+    /// Too short or too mixed to tell: treated as Italian.
+    case unknown
 }
 
-/// Tells Italian from English, on-device. Bilingual menus print English right under the Italian;
-/// that English is left alone: never "translated" again, never glued onto the Italian above it.
-/// Not thread-safe: use from one queue.
+/// Tells Italian from the languages printed beside it, on-device. Not thread-safe: use from one queue.
 final class LanguageDetector {
+    private static let candidates: [NLLanguage] = [.italian, .english, .french, .german, .spanish]
     private let recognizer = NLLanguageRecognizer()
     private var cache: [String: TextLanguage] = [:]
 
@@ -23,11 +28,10 @@ final class LanguageDetector {
     private func detect(_ text: String) -> TextLanguage {
         guard text.filter(\.isLetter).count >= 4 else { return .unknown }
         recognizer.reset()
-        recognizer.languageConstraints = [.italian, .english]
+        recognizer.languageConstraints = Self.candidates
         recognizer.processString(text)
-        let odds = recognizer.languageHypotheses(withMaximum: 2)
-        if odds[.english, default: 0] >= 0.75 { return .english }
-        if odds[.italian, default: 0] >= 0.75 { return .italian }
-        return .unknown
+        guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first else { return .unknown }
+        if language == .italian { return confidence >= 0.5 ? .italian : .unknown }
+        return confidence >= 0.75 ? .foreign : .unknown // only drop text we're sure isn't Italian
     }
 }
