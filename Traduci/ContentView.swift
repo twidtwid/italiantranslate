@@ -53,16 +53,17 @@ struct ContentView: View {
 
     /// The live camera, full screen (in demo mode, the demo picture).
     private var viewfinder: some View {
-        ZStack {
-            if let demo = model.demo {
-                Image(decorative: demo.image, scale: 1)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                CameraPreview(session: model.camera.session)
+        Color.clear // takes the screen's size; the picture fills it without widening the layout
+            .overlay {
+                if let demo = model.demo {
+                    Image(decorative: demo.image, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    CameraPreview(session: model.camera.session)
+                }
             }
-        }
-        .clipped()
+            .clipped()
         .contentShape(Rectangle())
         .gesture(pinch)
     }
