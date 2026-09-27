@@ -63,3 +63,4 @@ jobs:
           plutil -extract NSCameraUsageDescription raw "$APP/Info.plist"
           plutil -extract CFBundleDisplayName raw "$APP/Info.plist"
           plutil -extract MinimumOSVersion raw "$APP/Info.plist"
+          test "$(plutil -extract ITSAppUsesNonExemptEncryption raw "$APP/Info.plist")" = "false"
