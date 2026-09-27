@@ -48,3 +48,16 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -quiet \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Check the built app
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/Traduci.app"
+          ls -la "$APP"
+          # The app's own Swift types must be in the binary, not just an empty shell.
+          for type in TranslationEngine CameraController OverlayTracker TextBlockBuilder; do
+            strings "$APP/Traduci" | grep -q "$type" || { echo "::error::$type missing from binary"; exit 1; }
+          done
+          test -f "$APP/Assets.car"
+          plutil -extract NSCameraUsageDescription raw "$APP/Info.plist"
+          plutil -extract CFBundleDisplayName raw "$APP/Info.plist"
+          plutil -extract MinimumOSVersion raw "$APP/Info.plist"

@@ -39,7 +39,9 @@ final class AppModel {
         }
         camera.onFrame = { [weak self] result in
             guard let self else { return }
-            Task { @MainActor in self.handle(result) }
+            DispatchQueue.main.async { // strictly in frame order
+                MainActor.assumeIsolated { self.handle(result) }
+            }
         }
     }
 
