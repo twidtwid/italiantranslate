@@ -281,10 +281,12 @@ do {
 do {
     let nerocarbone = fixture("nerocarbone-p1-page") // the menu from a TestFlight report, page tilted
     let dishes = nerocarbone.filter { $0.kind == .item }
-    expect(dishes.count == 22, "every dish has its price: \(dishes.count) priced of \(nerocarbone.count)")
+    let unpriced = nerocarbone.filter { $0.kind == .text }.map(\.title)
+    expect(dishes.count == 22, "every dish has its price: \(dishes.count) priced; without: \(unpriced)")
     expect(entry(nerocarbone, "Pere e pecorino")?.price == "€8", "Pere e pecorino €8")
     expect(entry(nerocarbone, "CAPRAIA")?.price == "€10" && entry(nerocarbone, "CAPRAIA")?.details.count == 1, "the last dish")
-    expect(nerocarbone.filter { $0.kind == .heading }.count == 4, "four sections: \(nerocarbone.filter { $0.kind == .heading }.map(\.title))")
+    let sections = nerocarbone.filter { $0.kind == .heading && !$0.isForeign }.map(\.title)
+    expect(sections == ["PRIMI PIATTI •", "SECONDI PIATTI •", "CONTORNI•", "INSALATONE"], "four sections: \(sections)")
 
     let sanPastore = fixture("sanpastore-p1-page") // centred, price under each dish
     expect(sanPastore.filter { $0.kind == .item }.count == 9 && sanPastore.filter { $0.kind == .heading }.count == 2,

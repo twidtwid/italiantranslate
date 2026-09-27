@@ -36,6 +36,7 @@ jobs:
           "$RUNNER_TEMP/core-tests"
 
       - name: App OCR and menu reading
+        if: ${{ !cancelled() }}
         run: |
           xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
           "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
