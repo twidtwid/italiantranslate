@@ -4,8 +4,9 @@ name: TestFlight
 # Setup: README.md → "Install with TestFlight".
 on:
   workflow_dispatch: # the Run button shows up once this file is on main
-  push:
-    tags: ["testflight-*"] # or push a tag like testflight-2 from any branch
+  push: # every change to the app ships a build
+    branches: [main, claude/iphone-camera-translation-italian-ddayx8]
+    paths: ["Traduci/**", "Traduci.xcodeproj/**", ".github/workflows/testflight.yml"]
 
 concurrency:
   group: testflight
