@@ -30,7 +30,8 @@ def token() -> str:
 
 
 def call(method: str, path: str, params: dict | None = None, body: dict | None = None) -> dict:
-    url = f"{API}/{path}" + ("?" + urllib.parse.urlencode(params) if params else "")
+    url = path if path.startswith("https://") else f"{API}/{path}"  # full URLs: pagination links
+    url += "?" + urllib.parse.urlencode(params) if params else ""
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode() if body is not None else None,

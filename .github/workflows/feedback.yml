@@ -1,0 +1,54 @@
+name: TestFlight feedback
+
+# Pulls TestFlight feedback (comments, screenshots, crash logs) and commits it to the branch
+# encrypted to scripts/feedback_public_key.pem: the repo is public, so nothing readable is
+# logged or stored. Open the result with scripts/open_feedback.py and the matching private key.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, claude/iphone-camera-translation-italian-ddayx8]
+    paths: [scripts/feedback_public_key.pem]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: feedback-${{ github.ref }}
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BUNDLE_ID: ${{ vars.BUNDLE_ID || 'com.twidtwid.Traduci' }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }} # latest branch tip, so the commit below fast-forwards
+
+      - name: Install API key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Fetch and seal feedback
+        env:
+          KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyjwt cryptography pillow
+          "$RUNNER_TEMP/venv/bin/python" scripts/asc_feedback.py feedback/inbox.enc
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Commit the sealed bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add feedback/inbox.enc
+          git diff --cached --quiet && { echo "No new feedback."; exit 0; }
+          git commit -m "Encrypted TestFlight feedback drop"
+          git push origin "HEAD:$GITHUB_REF_NAME"
