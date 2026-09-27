@@ -1,0 +1,167 @@
+<!doctype html>
+<!--
+  Source for the README banner and the social cards in docs/images.
+  Regenerate with: node docs/design/render.mjs   (needs Playwright)
+  Layouts: ?layout=wide (1280×640), ?layout=square (1080×1080); add &rounded for transparent corners.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Traduci card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap">
+<style>
+  :root {
+    --bg-1: #0c0f13;
+    --bg-2: #151a21;
+    --text: #f2f4f6;
+    --muted: #9aa4af;
+    --faint: #66707b;
+    --green: #5fd49a;
+    --flag-green: #009246;
+    --flag-white: #f4f5f0;
+    --flag-red: #ce2b37;
+    --ink: #2a2017;
+    --paper: #f3ead8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body { font-family: Inter, system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(640px 520px at 78% 58%, rgba(62, 190, 130, 0.20), transparent 70%),
+      radial-gradient(520px 420px at 8% 0%, rgba(206, 43, 55, 0.10), transparent 70%),
+      linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  }
+  .rounded .card { border-radius: 28px; }
+  .wide .card { width: 1280px; height: 640px; }
+  .square .card { width: 1080px; height: 1080px; }
+
+  /* ---------- Copy ---------- */
+  .copy { position: absolute; }
+  .wide .copy { left: 76px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; }
+  .square .copy { left: 0; right: 0; top: 92px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .icon { width: 92px; height: 92px; border-radius: 21px; box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08); }
+  .name { font-size: 84px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  .flag { display: flex; width: 72px; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 12px; }
+  .flag i { flex: 1; }
+  .flag i:nth-child(1) { background: var(--flag-green); }
+  .flag i:nth-child(2) { background: var(--flag-white); }
+  .flag i:nth-child(3) { background: var(--flag-red); }
+
+  .headline { font-size: 44px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; margin-top: 38px; }
+  .headline em { font-style: normal; color: var(--green); }
+  .sub { font-size: 21px; line-height: 1.45; color: var(--muted); margin-top: 18px; max-width: 560px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .square .chips { justify-content: center; }
+  .chip { font-size: 16px; font-weight: 600; color: #d6dbe0; padding: 8px 14px; border-radius: 999px;
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.13); }
+  .url { position: absolute; font-size: 16px; font-weight: 500; color: var(--faint); letter-spacing: 0.01em; }
+  .wide .url { left: 76px; bottom: 40px; }
+  .square .url { left: 0; right: 0; bottom: 40px; text-align: center; }
+  .square .headline { font-size: 50px; margin-top: 34px; }
+  .square .sub { font-size: 22px; max-width: 760px; }
+
+  /* ---------- Phone ---------- */
+  .phone {
+    position: absolute; width: 284px; height: 596px; border-radius: 54px; padding: 10px;
+    background: linear-gradient(145deg, #3a3f46, #16181c 40%, #0a0b0d);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.10), inset 0 0 0 2px rgba(0,0,0,0.6);
+  }
+  .wide .phone { right: 132px; top: 22px; transform: rotate(3deg); }
+  .square .phone { left: 50%; top: 452px; transform: translateX(-50%) scale(1.12); transform-origin: top center; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 44px; overflow: hidden;
+            background:
+              repeating-linear-gradient(92deg, rgba(0,0,0,0.00) 0 7px, rgba(0,0,0,0.07) 7px 9px, rgba(255,255,255,0.02) 9px 15px),
+              radial-gradient(420px 360px at 50% 40%, #6a4a31, #3a2718 70%, #24180f); }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; border-radius: 14px; background: #000; z-index: 3; }
+
+  .pill { position: absolute; top: 48px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 6px;
+          font-size: 10.5px; font-weight: 600; color: #fff; padding: 7px 10px; border-radius: 12px;
+          background: rgba(30,30,30,0.55); backdrop-filter: blur(10px); border: 0.5px solid rgba(255,255,255,0.12); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+
+  /* The camera's view: a menu on a wooden table. */
+  .menu { position: absolute; left: 26px; right: 26px; top: 96px; padding: 20px 18px 22px; border-radius: 4px;
+          background: radial-gradient(circle at 40% 30%, #fbf5e8, var(--paper) 60%, #e7dcc4);
+          box-shadow: 0 18px 30px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.3);
+          transform: rotate(-1.2deg); color: var(--ink); font-family: "Cormorant Garamond", Georgia, serif; }
+  .menu h1 { font-size: 23px; font-weight: 700; text-align: center; font-style: italic; }
+  .menu h2 { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin: 14px 0 5px; color: #7a2e22; display: inline-block; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 15.5px; font-weight: 600; line-height: 1.5; }
+  .row b { font-weight: 700; font-family: "Cormorant Garamond", serif; }
+  .it { position: relative; display: inline-block; }
+  .center { text-align: center; }
+
+  /* Traduci's overlay: English exactly on top of the Italian it replaces. */
+  .en { position: absolute; inset: -1px -4px; display: flex; align-items: center; padding: 0 4px; border-radius: 3px;
+        background: rgba(0,0,0,0.80); color: #fff; font-family: Inter, sans-serif; font-weight: 600; white-space: nowrap;
+        font-size: 10.6px; letter-spacing: -0.01em; }
+  h1 .en { font-size: 15px; justify-content: center; font-style: normal; }
+  h2 .en { font-size: 8.6px; letter-spacing: 0; }
+
+  .controls { position: absolute; left: 0; right: 0; bottom: 22px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 3; }
+  .round { width: 44px; height: 44px; border-radius: 50%; background: rgba(40,40,40,0.55); backdrop-filter: blur(10px);
+           border: 0.5px solid rgba(255,255,255,0.14); display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .freeze { width: 64px; height: 64px; border-radius: 50%; border: 3.5px solid #fff; display: grid; place-items: center; }
+  .freeze span { width: 52px; height: 52px; border-radius: 50%; background: #fff; display: flex; gap: 5px; align-items: center; justify-content: center; }
+  .freeze span i { width: 5px; height: 17px; border-radius: 1.5px; background: #111; }
+  .torch { width: 9px; height: 18px; border-radius: 2px 2px 3px 3px; background: #fff; clip-path: polygon(0 0, 100% 0, 80% 45%, 80% 100%, 20% 100%, 20% 45%); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="copy">
+    <div class="brand">
+      <img class="icon" src="../../Traduci/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="">
+      <div>
+        <div class="name">Traduci</div>
+        <div class="flag"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="headline">Point your iPhone at Italian.<br><em>Read English.</em></div>
+    <div class="sub">Live camera translation that runs entirely on your iPhone. No network, no account, no waiting.</div>
+    <div class="chips">
+      <span class="chip">Works offline</span>
+      <span class="chip">Vision OCR</span>
+      <span class="chip">Apple Translation</span>
+      <span class="chip">SwiftUI</span>
+    </div>
+  </div>
+  <div class="url">github.com/twidtwid/italiantranslate</div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="pill"><span class="dot"></span>IT → EN · offline</div>
+      <div class="menu">
+        <h1><span class="it">Menù del giorno<span class="en">Today's menu</span></span></h1>
+        <h2><span class="it">Primi<span class="en">First courses</span></span></h2>
+        <div class="row"><span class="it">Spaghetti alla carbonara<span class="en">Spaghetti carbonara</span></span><b>12</b></div>
+        <div class="row"><span class="it">Risotto ai funghi porcini<span class="en">Porcini mushroom risotto</span></span><b>14</b></div>
+        <h2><span class="it">Secondi<span class="en">Main courses</span></span></h2>
+        <div class="row"><span class="it">Saltimbocca alla romana<span class="en">Roman-style saltimbocca</span></span><b>16</b></div>
+        <div class="row"><span class="it">Branzino al forno<span class="en">Baked sea bass</span></span><b>18</b></div>
+        <h2><span class="it">Dolci<span class="en">Desserts</span></span></h2>
+        <div class="row"><span class="it">Tiramisù della casa<span class="en">House tiramisu</span></span><b>7</b></div>
+        <div class="row"><span class="it">Panna cotta ai frutti di bosco<span class="en">Berry panna cotta</span></span><b>6</b></div>
+      </div>
+      <div class="controls">
+        <div class="round"><div class="torch"></div></div>
+        <div class="freeze"><span><i></i><i></i></span></div>
+        <div class="round">1×</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  document.body.classList.add(params.get("layout") || "wide");
+  if (params.has("rounded")) document.body.classList.add("rounded");
+</script>
+</body>
+</html>
