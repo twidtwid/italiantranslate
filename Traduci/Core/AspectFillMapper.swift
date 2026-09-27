@@ -55,6 +55,12 @@ struct AspectFillMapper {
         ).intersection(whole)
     }
 
+    /// The pan that puts `normalized` in the middle of the view (clamp it before use).
+    func centering(_ normalized: CGRect) -> CGSize {
+        let size = displayedSize
+        return CGSize(width: size.width * (0.5 - normalized.midX), height: size.height * (0.5 - normalized.midY))
+    }
+
     /// The nearest pan that keeps the image covering the whole view.
     func clamped(_ pan: CGSize) -> CGSize {
         let size = displayedSize

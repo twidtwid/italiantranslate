@@ -3,6 +3,15 @@ import Foundation
 import CoreGraphics
 #endif
 
+/// One line of text from OCR. `box` is normalized (0...1) in the upright image, origin top-left.
+struct OCRLine: Equatable {
+    var text: String
+    var box: CGRect
+    /// The line's own corners (top left, top right, bottom right, bottom left), same coordinates as
+    /// `box`, when OCR reports them: a slanted line's box is taller than its text.
+    var corners: [CGPoint] = []
+}
+
 /// Reading a capture in overlapping bands, then putting the lines back together. Vision reads at a
 /// fixed working resolution, so each band is a closer look than the whole frame.
 enum OCRTiles {
@@ -34,11 +43,14 @@ enum OCRTiles {
         return kept
     }
 
+    /// Two readings of one printed line: they cover the same spot and say much the same. (On a
+    /// slanted page the boxes of neighbouring lines overlap too, so the words have to agree.)
     private static func sameSpot(_ a: OCRLine, _ b: OCRLine) -> Bool {
         let overlap = a.box.intersection(b.box)
         guard !overlap.isNull else { return false }
         let smaller = min(a.box.width * a.box.height, b.box.width * b.box.height)
-        return smaller > 0 && overlap.width * overlap.height >= 0.5 * smaller
+        guard smaller > 0, overlap.width * overlap.height >= 0.5 * smaller else { return false }
+        return a.text.contains(b.text) || b.text.contains(a.text) || TextNormalizer.similarity(a.text, b.text) >= 0.5
     }
 }
 

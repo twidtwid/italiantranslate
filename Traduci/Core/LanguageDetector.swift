@@ -50,6 +50,11 @@ final class LanguageDetector {
         // Menu English is often misspelled or cut short ("Nodles with trufle", "Parmesan aubergines"
         // reads 38 % French, 27 % German): count the three together.
         let foreign = Self.foreign.reduce(0) { $0 + (guesses[$1] ?? 0) }
+        // One or two words are easy to misjudge ("Zeppole salate" reads 68 % English): only
+        // near-certainty counts there.
+        if text.split(whereSeparator: { !$0.isLetter }).count <= 2 {
+            return foreign >= 0.9 && italian < 0.1 ? .foreign : .unknown
+        }
         return foreign >= 0.6 && italian < 0.3 ? .foreign : .unknown
     }
 }

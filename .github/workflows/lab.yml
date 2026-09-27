@@ -5,7 +5,7 @@ name: Menu lab
 on:
   push:
     branches: ["claude/**"]
-    paths: ["Tests/Lab/**", "Traduci/**", ".github/workflows/lab.yml"]
+    paths: ["Tests/**", "Traduci/**", ".github/workflows/lab.yml"]
   workflow_dispatch:
 
 permissions:
@@ -30,7 +30,12 @@ jobs:
           "$RUNNER_TEMP/venv/bin/pip" install --quiet pymupdf==1.28.2 numpy==2.4.6 opencv-python-headless==5.0.0.93
           "$RUNNER_TEMP/venv/bin/python" Tests/Lab/fixtures.py Tests/Lab/menus.json "$LAB/frames"
 
-      - name: App OCR and grouping
+      - name: Core logic tests
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/CoreTests/main.swift -o "$RUNNER_TEMP/core-tests"
+          "$RUNNER_TEMP/core-tests"
+
+      - name: App OCR and menu reading
         run: |
           xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
           "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
