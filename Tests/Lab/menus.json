@@ -14,5 +14,7 @@
   {"name": "casadelconte", "url": "https://www.ristorantecasadelconte.it/wp-content/uploads/2024/04/menu-ristorante-casa-del-conte-maggio.pdf",
    "about": "Modern menu, allergen numbers"},
   {"name": "indigo", "url": "https://digital.ihg.com/is/content/ihg/hotel-indigo-florence-10799815456-original?fmt=pdf",
-   "about": "Hotel restaurant in Florence, bilingual sections"}
+   "about": "Hotel restaurant in Florence, bilingual sections"},
+  {"name": "plaque", "file": "Tests/Lab/plaque.png",
+   "about": "From a TestFlight report: a winery plaque, paragraphs of prose in light letters on corten steel"}
 ]

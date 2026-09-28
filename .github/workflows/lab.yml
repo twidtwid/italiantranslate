@@ -88,6 +88,8 @@ jobs:
           shoot 6-two-columns casadelconte-p1-middle.jpg 32
           shoot 7-bilingual-peek piccadilly-p1-top.jpg 28 -demoPanel peek
           shoot 8-bilingual-full piccadilly-p1-page.jpg 28 -demoPanel full
+          shoot 9-plaque-list plaque-p1-page.jpg 28 -demoPanel full
+          shoot 10-plaque-photo plaque-p1-page.jpg 28 -demoPanel peek -demoFocus 1
           ls -la "$LAB/screens"
 
       - name: Publish results
