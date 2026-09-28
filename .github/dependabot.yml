@@ -1,11 +1,15 @@
 # Keeps the pinned CI dependencies current: GitHub Actions (pinned to commits) and the Python
-# packages the TestFlight, feedback and lab workflows install.
+# packages the TestFlight, feedback and lab workflows install. Updates are tested and merged
+# without waiting on a person, so a new version has to be a week old first: bad releases are
+# usually pulled by then. One PR per ecosystem and folder.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -13,7 +17,17 @@ updates:
     directory: /scripts
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      scripts:
+        patterns: ["*"]
   - package-ecosystem: pip
     directory: /Tests/Lab
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      lab:
+        patterns: ["*"]
