@@ -232,19 +232,33 @@ final class AppModel {
         mode = .reading
     }
 
+    /// The first reading puts the list up with the picture; the close one, a moment later, brings
+    /// the small print. An entry both readings found keeps its place: only what's new moves.
     private func handleStill(_ result: StillResult) {
         guard mode == .reading, isReadingPage else { return }
-        isReadingPage = false
+        if result.isFinal { isReadingPage = false }
+        let room = Captions.room(result.entries)
+        var unclaimed = captions
+        var nextID = (captions.map(\.id).max() ?? -1) + 1
         captions = result.entries.enumerated().map { index, entry in
-            var caption = Caption(id: index, entry: entry, colors: result.colors[index])
+            let id: Int
+            if let match = unclaimed.firstIndex(where: { $0.entry.title == entry.title }) {
+                id = unclaimed.remove(at: match).id
+            } else {
+                id = nextID
+                nextID += 1
+            }
+            var caption = Caption(id: id, entry: entry, colors: result.colors[index])
+            caption.roomRight = room[index]
             for source in entry.sources {
                 caption.english[source] = engine.cache[source]
             }
             return caption
         }
+        if let focusedID, !captions.contains(where: { $0.id == focusedID }) { self.focusedID = nil }
         engine.request(Captions.priority(result.entries, centralFirst: false))
-        if let focus = demo?.focus, captions.indices.contains(focus) {
-            self.focus(focus, fromList: true)
+        if result.isFinal, let focus = demo?.focus, captions.indices.contains(focus) {
+            self.focus(captions[focus].id, fromList: true)
         }
     }
 

@@ -83,11 +83,11 @@ for url in frames(in: input) {
     let aspect = CGFloat(image.height) / CGFloat(image.width)
 
     var started = Date()
-    let whole = recognizer.lines(in: image, orientation: .up, fast: false)
+    let whole = recognizer.lines(in: image, orientation: .up)
     let wholeMs = Date().timeIntervalSince(started) * 1000
     var row = "| \(frame) | \(whole.count) / \(priceCount(whole)) / \(Int(wholeMs))"
     started = Date()
-    let lines = OCRTiles.merge([whole, recognizer.lines(in: image, fast: false, bands: 2)]) // what a capture reads
+    let lines = OCRTiles.merge([whole, recognizer.lines(in: image, bands: 2)]) // what a capture reads
     row += " | \(lines.count) / \(priceCount(lines)) / \(Int(Date().timeIntervalSince(started) * 1000))"
     comparison += row + " |\n"
 

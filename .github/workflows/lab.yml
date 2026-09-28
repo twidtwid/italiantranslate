@@ -43,6 +43,18 @@ jobs:
           xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
           "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
 
+      - name: Real English, if the runner has Italian
+        if: ${{ !cancelled() }}
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/Lab/Translate/main.swift -o "$RUNNER_TEMP/translate"
+          "$RUNNER_TEMP/translate" "$LAB/app"
+
+      - name: Vision's document reader, for comparison
+        if: ${{ !cancelled() }}
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/Lab/Common.swift Tests/Lab/Documents/main.swift -o "$RUNNER_TEMP/documents"
+          "$RUNNER_TEMP/documents" "$LAB/frames" "$LAB/app"
+
       - name: The app in the Simulator
         if: ${{ !cancelled() }}
         run: |
