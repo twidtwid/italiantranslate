@@ -4,3 +4,8 @@ DerivedData/
 build/
 *.xcuserstate
 __pycache__/
+.venv/
+node_modules/
+lab-results/
+*.p8
+*_private.pem

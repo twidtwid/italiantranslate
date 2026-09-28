@@ -11,7 +11,7 @@ const out = join(here, "..", "images");
 const page = pathToFileURL(join(here, "card.html")).href;
 
 const renders = [
-  { file: "banner.png", query: "layout=wide&rounded", width: 1280, height: 640, scale: 2, transparent: true },
+  { file: "banner.png", query: "layout=wide&rounded", width: 1280, height: 640, scale: 1.5, transparent: true },
   { file: "social-preview.png", query: "layout=wide", width: 1280, height: 640, scale: 1 },
   { file: "social-square.png", query: "layout=square", width: 1080, height: 1080, scale: 1 },
 ];

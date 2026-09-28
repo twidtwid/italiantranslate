@@ -16,7 +16,7 @@
     --text: #f2f4f6;
     --muted: #9aa4af;
     --faint: #66707b;
-    --green: #5fd49a;
+    --amber: #ffc254;
     --flag-green: #009246;
     --flag-white: #f4f5f0;
     --flag-red: #ce2b37;
@@ -31,7 +31,7 @@
     position: relative;
     overflow: hidden;
     background:
-      radial-gradient(640px 520px at 78% 58%, rgba(62, 190, 130, 0.20), transparent 70%),
+      radial-gradient(640px 520px at 78% 58%, rgba(255, 180, 70, 0.16), transparent 70%),
       radial-gradient(520px 420px at 8% 0%, rgba(206, 43, 55, 0.10), transparent 70%),
       linear-gradient(160deg, var(--bg-2), var(--bg-1));
   }
@@ -54,7 +54,7 @@
   .flag i:nth-child(3) { background: var(--flag-red); }
 
   .headline { font-size: 44px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; margin-top: 38px; }
-  .headline em { font-style: normal; color: var(--green); }
+  .headline em { font-style: normal; color: var(--amber); }
   .sub { font-size: 21px; line-height: 1.45; color: var(--muted); margin-top: 18px; max-width: 560px; }
   .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
   .square .chips { justify-content: center; }
@@ -73,44 +73,46 @@
     box-shadow: 0 40px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.10), inset 0 0 0 2px rgba(0,0,0,0.6);
   }
   .wide .phone { right: 132px; top: 22px; transform: rotate(3deg); }
-  .square .phone { left: 50%; top: 452px; transform: translateX(-50%) scale(1.12); transform-origin: top center; }
+  .square .phone { left: 50%; top: 522px; transform: translateX(-50%) scale(1.12); transform-origin: top center; }
   .screen { position: relative; width: 100%; height: 100%; border-radius: 44px; overflow: hidden;
             background:
               repeating-linear-gradient(92deg, rgba(0,0,0,0.00) 0 7px, rgba(0,0,0,0.07) 7px 9px, rgba(255,255,255,0.02) 9px 15px),
               radial-gradient(420px 360px at 50% 40%, #6a4a31, #3a2718 70%, #24180f); }
   .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; border-radius: 14px; background: #000; z-index: 3; }
 
-  .pill { position: absolute; top: 48px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 6px;
-          font-size: 10.5px; font-weight: 600; color: #fff; padding: 7px 10px; border-radius: 12px;
-          background: rgba(30,30,30,0.55); backdrop-filter: blur(10px); border: 0.5px solid rgba(255,255,255,0.12); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
 
-  /* The camera's view: a menu on a wooden table. */
-  .menu { position: absolute; left: 26px; right: 26px; top: 96px; padding: 20px 18px 22px; border-radius: 4px;
+  /* The captured page: a menu on a wooden table, the English printed in its own paper and ink. */
+  .photo { position: absolute; left: 0; right: 0; top: 0; height: 262px; overflow: hidden; }
+  .menu { position: absolute; left: 22px; right: 22px; top: 44px; padding: 16px 16px 30px; border-radius: 4px;
           background: radial-gradient(circle at 40% 30%, #fbf5e8, var(--paper) 60%, #e7dcc4);
           box-shadow: 0 18px 30px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.3);
-          transform: rotate(-1.2deg); color: var(--ink); font-family: "Cormorant Garamond", Georgia, serif; }
-  .menu h1 { font-size: 23px; font-weight: 700; text-align: center; font-style: italic; }
-  .menu h2 { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin: 14px 0 5px; color: #7a2e22; display: inline-block; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 15.5px; font-weight: 600; line-height: 1.5; }
-  .row b { font-weight: 700; font-family: "Cormorant Garamond", serif; }
-  .it { position: relative; display: inline-block; }
-  .center { text-align: center; }
+          transform: rotate(-1.2deg); color: var(--ink); }
+  .menu h1 { font: italic 700 17px "Cormorant Garamond", Georgia, serif; text-align: center; }
+  .menu h2 { font: 700 8.5px Inter, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; margin: 10px 0 3px; color: #7a2e22; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; font: 600 10.5px Inter, sans-serif; line-height: 1.55; }
+  .row b { font: 700 12.5px "Cormorant Garamond", serif; }
+  .picked { outline: 1.8px solid var(--amber); outline-offset: 2px; border-radius: 3px; }
 
-  /* Traduci's overlay: English exactly on top of the Italian it replaces. */
-  .en { position: absolute; inset: -1px -4px; display: flex; align-items: center; padding: 0 4px; border-radius: 3px;
-        background: rgba(0,0,0,0.80); color: #fff; font-family: Inter, sans-serif; font-weight: 600; white-space: nowrap;
-        font-size: 10.6px; letter-spacing: -0.01em; }
-  h1 .en { font-size: 15px; justify-content: center; font-style: normal; }
-  h2 .en { font-size: 8.6px; letter-spacing: 0; }
-
-  .controls { position: absolute; left: 0; right: 0; bottom: 22px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 3; }
-  .round { width: 44px; height: 44px; border-radius: 50%; background: rgba(40,40,40,0.55); backdrop-filter: blur(10px);
-           border: 0.5px solid rgba(255,255,255,0.14); display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
-  .freeze { width: 64px; height: 64px; border-radius: 50%; border: 3.5px solid #fff; display: grid; place-items: center; }
-  .freeze span { width: 52px; height: 52px; border-radius: 50%; background: #fff; display: flex; gap: 5px; align-items: center; justify-content: center; }
-  .freeze span i { width: 5px; height: 17px; border-radius: 1.5px; background: #111; }
-  .torch { width: 9px; height: 18px; border-radius: 2px 2px 3px 3px; background: #fff; clip-path: polygon(0 0, 100% 0, 80% 45%, 80% 100%, 20% 100%, 20% 45%); }
+  /* The English, at a size you can read at the table. */
+  .panel { position: absolute; left: 0; right: 0; top: 240px; bottom: 0; background: #1b1b1c;
+           border-radius: 20px 20px 0 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.4); padding: 7px 0 0; z-index: 2; }
+  .grabber { width: 30px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.28); margin: 0 auto 8px; }
+  .head { display: flex; align-items: center; gap: 8px; padding: 0 14px 9px; border-bottom: 0.5px solid rgba(255,255,255,0.12); }
+  .head .title { font-size: 12.5px; font-weight: 700; }
+  .head .count { font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .head .grow { flex: 1; }
+  .share { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.1); display: grid; place-items: center; }
+  .scan { font-size: 11px; font-weight: 700; color: #111; background: var(--amber); padding: 6px 12px; border-radius: 999px; }
+  .list { padding: 2px 0 0; }
+  .section { padding: 10px 14px 3px; }
+  .section b { display: block; font-size: 8px; font-weight: 800; letter-spacing: 0.14em; color: var(--amber); }
+  .section i { display: block; font-size: 8px; font-style: normal; color: rgba(255,255,255,0.42); margin-top: 1px; }
+  .dish { display: flex; justify-content: space-between; gap: 8px; padding: 6px 14px; }
+  .dish.on { background: rgba(255,194,84,0.13); box-shadow: inset 2.5px 0 0 var(--amber); }
+  .dish strong { display: block; font-size: 11px; font-weight: 650; color: #fff; }
+  .dish small { display: block; font-size: 8.8px; color: rgba(255,255,255,0.62); margin-top: 1px; }
+  .dish em { display: block; font-size: 8.4px; color: rgba(255,255,255,0.42); margin-top: 1px; }
+  .dish .price { font-size: 11px; font-weight: 600; color: var(--amber); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -123,13 +125,13 @@
         <div class="flag"><i></i><i></i><i></i></div>
       </div>
     </div>
-    <div class="headline">Point your iPhone at Italian.<br><em>Read English.</em></div>
-    <div class="sub">Live camera translation that runs entirely on your iPhone. No network, no account, no waiting.</div>
+    <div class="headline">Point at an Italian menu.<br><em>Read it in English.</em></div>
+    <div class="sub">One picture, and the menu stays put: every dish in English with its price and the Italian name to order by. All on the iPhone, offline.</div>
     <div class="chips">
       <span class="chip">Works offline</span>
+      <span class="chip">Reads menus</span>
       <span class="chip">Vision OCR</span>
       <span class="chip">Apple Translation</span>
-      <span class="chip">SwiftUI</span>
     </div>
   </div>
   <div class="url">github.com/twidtwid/italiantranslate</div>
@@ -137,23 +139,33 @@
   <div class="phone">
     <div class="screen">
       <div class="island"></div>
-      <div class="pill"><span class="dot"></span>IT → EN · offline</div>
-      <div class="menu">
-        <h1><span class="it">Menù del giorno<span class="en">Today's menu</span></span></h1>
-        <h2><span class="it">Primi<span class="en">First courses</span></span></h2>
-        <div class="row"><span class="it">Spaghetti alla carbonara<span class="en">Spaghetti carbonara</span></span><b>12</b></div>
-        <div class="row"><span class="it">Risotto ai funghi porcini<span class="en">Porcini mushroom risotto</span></span><b>14</b></div>
-        <h2><span class="it">Secondi<span class="en">Main courses</span></span></h2>
-        <div class="row"><span class="it">Saltimbocca alla romana<span class="en">Roman-style saltimbocca</span></span><b>16</b></div>
-        <div class="row"><span class="it">Branzino al forno<span class="en">Baked sea bass</span></span><b>18</b></div>
-        <h2><span class="it">Dolci<span class="en">Desserts</span></span></h2>
-        <div class="row"><span class="it">Tiramisù della casa<span class="en">House tiramisu</span></span><b>7</b></div>
-        <div class="row"><span class="it">Panna cotta ai frutti di bosco<span class="en">Berry panna cotta</span></span><b>6</b></div>
+      <div class="photo">
+        <div class="menu">
+          <h1>Today's menu</h1>
+          <h2>First courses</h2>
+          <div class="row"><span>Spaghetti carbonara</span><b>12</b></div>
+          <div class="row"><span class="picked">Porcini mushroom risotto</span><b>14</b></div>
+          <h2>Main courses</h2>
+          <div class="row"><span>Roman-style saltimbocca</span><b>16</b></div>
+          <div class="row"><span>Baked sea bass</span><b>18</b></div>
+        </div>
       </div>
-      <div class="controls">
-        <div class="round"><div class="torch"></div></div>
-        <div class="freeze"><span><i></i><i></i></span></div>
-        <div class="round">1×</div>
+      <div class="panel">
+        <div class="grabber"></div>
+        <div class="head">
+          <div><div class="title">Menu in English</div><div class="count">7 dishes</div></div>
+          <div class="grow"></div>
+          <div class="share"><svg width="11" height="13" viewBox="0 0 11 13" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8V1M3 3.3 5.5 1 8 3.3M3.2 5.5H2v6.5h7V5.5H7.8"/></svg></div>
+          <div class="scan">Scan</div>
+        </div>
+        <div class="list">
+          <div class="section"><b>FIRST COURSES</b><i>Primi</i></div>
+          <div class="dish"><div><strong>Spaghetti carbonara</strong><small>guanciale, egg, pecorino</small><em>Spaghetti alla carbonara</em></div><span class="price">€12</span></div>
+          <div class="dish on"><div><strong>Porcini mushroom risotto</strong><em>Risotto ai funghi porcini</em></div><span class="price">€14</span></div>
+          <div class="section"><b>MAIN COURSES</b><i>Secondi</i></div>
+          <div class="dish"><div><strong>Roman-style saltimbocca</strong><em>Saltimbocca alla romana</em></div><span class="price">€16</span></div>
+          <div class="dish"><div><strong>Baked sea bass</strong><em>Branzino al forno</em></div><span class="price">€18</span></div>
+        </div>
       </div>
     </div>
   </div>

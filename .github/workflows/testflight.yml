@@ -8,6 +8,9 @@ on:
     branches: [main, claude/iphone-camera-translation-italian-ddayx8]
     paths: ["Traduci/**", "Traduci.xcodeproj/**", ".github/workflows/testflight.yml"]
 
+permissions:
+  contents: read
+
 concurrency:
   group: testflight
   cancel-in-progress: false
@@ -25,7 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Check secrets
         env:
@@ -50,7 +55,7 @@ jobs:
           KEY_PATH: ${{ runner.temp }}/AuthKey.p8
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyjwt cryptography
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet -r scripts/requirements.txt
           "$RUNNER_TEMP/venv/bin/python" scripts/asc_preflight.py
 
   upload:
@@ -61,7 +66,9 @@ jobs:
     env:
       BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Install API key
         env:

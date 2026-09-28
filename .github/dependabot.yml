@@ -1,0 +1,19 @@
+# Keeps the pinned CI dependencies current: GitHub Actions (pinned to commits) and the Python
+# packages the TestFlight, feedback and lab workflows install.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /scripts
+    schedule:
+      interval: monthly
+  - package-ecosystem: pip
+    directory: /Tests/Lab
+    schedule:
+      interval: monthly

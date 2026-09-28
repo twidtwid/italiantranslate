@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="docs/images/banner.png" alt="Traduci: point at an Italian menu, read it in English" width="820">
+</p>
+
+<p align="center">
+  <a href="https://github.com/twidtwid/italiantranslate/actions/workflows/ios.yml"><img src="https://github.com/twidtwid/italiantranslate/actions/workflows/ios.yml/badge.svg" alt="iOS build"></a>
+  <img src="https://img.shields.io/badge/iOS-18%2B-000000?logo=apple&logoColor=white" alt="iOS 18 or later">
+  <img src="https://img.shields.io/badge/offline-on--device-2ea44f" alt="Works offline, on the device">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
+</p>
+
 # Traduci
 
 Point your iPhone at an Italian menu or sign and read it in English. Traduci opens straight into the camera. Hold still over the text (or tap) and it takes the picture, then gives you the page in English: every dish in a list you can read at the table, with its price and the Italian name to order by, and the English painted over the photo.
@@ -6,6 +17,15 @@ Point your iPhone at an Italian menu or sign and read it in English. Traduci ope
 - **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. While you aim, the text nearest the centre is translated ahead, so most of the page is already in English when the picture is taken. Every result is cached, and the translation model is loaded before the first text shows up.
 - **Reads menus like a diner.** It works out which lines are one dish, which are its ingredients and allergens, which price goes with it (in a price column, under a centred dish, or at the end of the ingredients), where the sections start, and which way the columns go. English that the menu already prints is left alone.
 - **Stays put.** The picture stays until you tap **Scan**: put the phone down, pass it across the table, it's still there.
+
+<p align="center">
+  <img src="docs/images/screenshots/aiming.jpg" width="250" alt="Aiming at a menu: the ring around the shutter fills while the phone is held still">
+  &nbsp;
+  <img src="docs/images/screenshots/menu.jpg" width="250" alt="The menu in English below the photo: dishes, ingredients, prices and the Italian names">
+  &nbsp;
+  <img src="docs/images/screenshots/find-a-dish.jpg" width="250" alt="Tapping a dish in the list zooms the photo to it and outlines it">
+</p>
+<p align="center"><sub>Aiming, reading, and finding a dish on the photo. Screenshots from the menu lab's Simulator run: the Simulator has no translation models, so the English there is canned.</sub></p>
 
 ## Install with TestFlight (no Mac)
 
@@ -84,7 +104,17 @@ menu reader: level the page ─► glue split lines ─► prices ─► dish / 
 | `Tests/Lab/`, `.github/workflows/lab.yml` | The menu lab, below |
 | `.github/workflows/ios.yml` | Every push: core tests plus an iOS build with Xcode 26 and Xcode 27 |
 | `.github/workflows/testflight.yml`, `scripts/asc_preflight.py` | Check the Apple setup, then archive, cloud-sign and upload to TestFlight |
+| `.github/workflows/feedback.yml`, `scripts/asc_feedback.py` | Fetch TestFlight feedback and commit it encrypted; `scripts/open_feedback.py` opens it with the private key |
+| `docs/design/` | Source for the banner and social cards: `node docs/design/render.mjs` |
 
 ## The menu lab
 
 Real Italian menus, run through the app's own OCR and menu reader on a Mac, and through the app itself in the iPhone Simulator. `Tests/Lab/menus.json` lists the menus (PDFs from restaurant websites, fetched when the lab runs, and one retyped from a TestFlight report). `fixtures.py` turns each page into phone-camera frames: the whole page from arm's length and closer looks, with a slight tilt, warm uneven light, blur and noise. The **Menu lab** workflow reads every frame, draws what it found, and screenshots the app on a few of them in demo mode (the Simulator has no camera and no translation models, so a picture stands in for the camera and `english.json` for the translator). Results go to a draft release named `lab`. Commits tagged `[lab]` skip TestFlight and the full build.
+
+## Contributing
+
+Menus it reads badly, bugs and ideas are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md). Security problems go through [private reporting](SECURITY.md), not public issues.
+
+## License
+
+[MIT](LICENSE). Apple's Vision and Translation frameworks, and the language models iOS downloads, are Apple's and come with iOS.

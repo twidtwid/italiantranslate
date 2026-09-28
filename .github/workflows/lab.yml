@@ -22,12 +22,14 @@ jobs:
     env:
       LAB: ${{ github.workspace }}/lab-results
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Camera frames from the menus
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install --quiet pymupdf==1.28.2 numpy==2.4.6 opencv-python-headless==5.0.0.93
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet -r Tests/Lab/requirements.txt
           "$RUNNER_TEMP/venv/bin/python" Tests/Lab/fixtures.py Tests/Lab/menus.json "$LAB/frames"
 
       - name: Core logic tests
