@@ -363,7 +363,7 @@ struct ReadingPanel: View {
         if done < translatable.count { return "Translating \(done) of \(translatable.count)…" }
         let dishes = model.captions.filter { $0.entry.kind == .item }.count
         if dishes > 0 { return dishes == 1 ? "1 dish" : "\(dishes) dishes" }
-        return translatable.count == 1 ? "1 line" : "\(translatable.count) lines"
+        return translatable.isEmpty ? "Already in English" : "Translated on this iPhone"
     }
 }
 

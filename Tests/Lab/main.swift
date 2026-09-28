@@ -48,6 +48,7 @@ func record(_ lines: [OCRLine]) -> [[String: Any]] {
             "corners": line.corners.flatMap { [Double($0.x), Double($0.y)] }.map { ($0 * 10_000).rounded() / 10_000 },
             "language": name(languages.language(of: line.text)),
             "hypotheses": languages.hypotheses(for: line.text),
+            "confidence": (Double(line.confidence) * 1000).rounded() / 1000,
         ] as [String: Any]
     }
 }

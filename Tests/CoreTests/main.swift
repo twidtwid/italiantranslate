@@ -149,6 +149,12 @@ do {
                          box: CGRect(x: 0.05, y: 0.41, width: 0.9, height: 0.05),
                          corners: [CGPoint(x: 0.05, y: 0.435), CGPoint(x: 0.95, y: 0.41), CGPoint(x: 0.95, y: 0.435), CGPoint(x: 0.05, y: 0.46)])
     expect(OCRTiles.merge([[rampa], [tilted]]).count == 2, "a slanted neighbour whose box overlaps stays too")
+
+    // Two whole readings of one allergen line (the lab's casadelconte page): the surer one stays.
+    let blurred = OCRLine(text: "alutine. cesce", box: CGRect(x: 0.101, y: 0.671, width: 0.108, height: 0.008), confidence: 0.5)
+    let sharp = OCRLine(text: "glutine, pesce", box: CGRect(x: 0.098, y: 0.671, width: 0.113, height: 0.010), confidence: 1)
+    expect(OCRTiles.merge([[blurred], [sharp]]) == [sharp] && OCRTiles.merge([[sharp], [blurred]]) == [sharp],
+           "the surer reading wins, whichever pass made it")
 }
 
 // MARK: Prices

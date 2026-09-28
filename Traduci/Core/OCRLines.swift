@@ -29,20 +29,28 @@ enum OCRTiles {
         }
     }
 
-    /// Every line once. Where two readings of overlapping bands cover the same spot, the longer one
-    /// wins: a line cut by a band's edge reads shorter than the whole line in the next band.
+    /// Every line once. Where two readings cover the same spot, the whole line beats a piece of it,
+    /// and between two whole readings the surer one wins ("glutine, pesce" over "alutine. cesce");
+    /// on a tie, the later reading, which is the closer look.
     static func merge(_ readings: [[OCRLine]]) -> [OCRLine] {
         var kept: [OCRLine] = []
         for reading in readings {
             for line in reading {
                 if let index = kept.firstIndex(where: { sameSpot($0, line) }) {
-                    if line.text.count > kept[index].text.count { kept[index] = line }
+                    if better(line, than: kept[index]) { kept[index] = line }
                 } else {
                     kept.append(line)
                 }
             }
         }
         return kept
+    }
+
+    private static func better(_ line: OCRLine, than other: OCRLine) -> Bool {
+        let length = line.text.count, otherLength = other.text.count
+        if length > otherLength + max(2, otherLength / 10) { return true } // the other is a piece
+        if otherLength > length + max(2, length / 10) { return false }
+        return line.confidence >= other.confidence
     }
 
     /// Two readings of one printed line: they cover the same spot and say much the same. (On a
