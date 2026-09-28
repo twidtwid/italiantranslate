@@ -441,6 +441,12 @@ do {
     expect(DishGlossary.prepare("SECONDI PIATTI •") == .known("Main courses") && DishGlossary.prepare("Contorni") == .known("Side dishes"),
            "course headings")
     expect(DishGlossary.prepare("Coperto") == .known("Cover charge"), "the cover charge")
+    expect(DishGlossary.rewrite("Gelato coperto di cioccolato") == "Gelato coperto di cioccolato", "coperto inside a line is just \"covered\"")
+    expect(DishGlossary.prepare("Secondi Pialli") == .known("Main courses") && DishGlossary.prepare("Primi Pialli") == .known("First courses"),
+           "a heading OCR misread")
+    expect(DishGlossary.prepare("Secondi di pesce") == .translate("Secondi di pesce"), "but not a different heading")
+    expect(DishGlossary.prepare("Con un primo piatto") == .translate("Con un primo piatto"), "or a line that says more than the heading")
+    expect(DishGlossary.rewrite("Fettuccine speck e finferli") == "Fettuccine speck e chanterelle", "an English name passes through the translator")
     expect(DishGlossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
 }
 

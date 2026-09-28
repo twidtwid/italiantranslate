@@ -15,8 +15,21 @@ enum DishGlossary {
 
     /// What to do with `source` (as OCR read it): its English, or the text to translate.
     static func prepare(_ source: String) -> Prepared {
-        if let english = dishes[key(source)] { return .known(english) }
+        let key = key(source)
+        if let english = courses[key] ?? dishes[key] ?? course(misread: key) { return .known(english) }
         return .translate(rewrite(TextNormalizer.translationInput(source)))
+    }
+
+    /// A course heading OCR got a letter or two wrong ("Primi Pialli", "Secondi Pialli"). Headings
+    /// are few and unalike, so a close reading of one about as long can only be that one; a longer
+    /// line that contains one ("Con un primo piatto") says more, and goes to the translator.
+    static func course(misread key: String) -> String? {
+        let letters = key.filter(\.isLetter).count
+        guard letters >= 7 else { return nil }
+        let alike = courses.filter { abs($0.key.filter(\.isLetter).count - letters) <= 2 }
+        let best = alike.max { TextNormalizer.similarity($0.key, key) < TextNormalizer.similarity($1.key, key) }
+        guard let best, TextNormalizer.similarity(best.key, key) >= 0.7 else { return nil }
+        return best.value
     }
 
     /// Spells out the kitchen words the translator doesn't know, in plain Italian.
@@ -49,21 +62,24 @@ enum DishGlossary {
         return TextNormalizer.collapseWhitespace(trimmed)
     }
 
-    /// Dishes by name (keys as `key` makes them). The English says what it is, briefly.
-    static let dishes: [String: String] = [
-        // The menu's own words: courses and charges ("Secondi" → "Seconds", "Coperto" → "Covered")
+    /// The menu's own words: courses and charges ("Secondi" → "Seconds", "Coperto" → "Covered").
+    static let courses: [String: String] = [
         "antipasti": "Starters", "antipasto": "Starter",
-        "primi": "First courses", "primi piatti": "First courses", "i primi": "First courses",
-        "secondi": "Main courses", "secondi piatti": "Main courses", "i secondi": "Main courses",
+        "primi": "First courses", "primi piatti": "First courses", "i primi": "First courses", "primo piatto": "First course",
+        "secondi": "Main courses", "secondi piatti": "Main courses", "i secondi": "Main courses", "secondo piatto": "Main course",
         "contorni": "Side dishes", "contorno": "Side dish",
         "dolci": "Desserts", "i dolci": "Desserts", "formaggi": "Cheeses",
-        "insalate": "Salads", "insalatone": "Large salads", "zuppe": "Soups", "minestre": "Soups",
+        "insalata": "Salad", "insalate": "Salads", "insalatone": "Large salads", "zuppe": "Soups", "minestre": "Soups",
         "pizze": "Pizzas", "le pizze": "Pizzas", "schiacciate": "Tuscan flatbread sandwiches",
         "taglieri": "Boards of cured meats and cheeses", "piatti del giorno": "Today's dishes",
         "bevande": "Drinks", "bibite": "Soft drinks", "vini": "Wines", "vini rossi": "Red wines",
         "vini bianchi": "White wines", "birre": "Beers", "aperitivi": "Aperitifs", "digestivi": "Digestifs",
         "amari": "Digestifs", "caffetteria": "Coffee",
         "coperto": "Cover charge", "coperto e servizio": "Cover and service charge",
+    ]
+
+    /// Dishes by name (keys as `key` makes them). The English says what it is, briefly.
+    static let dishes: [String: String] = [
         // Tuscany
         "ribollita": "Tuscan bread, bean and cabbage soup",
         "ribollita toscana": "Tuscan bread, bean and cabbage soup",
@@ -139,6 +155,7 @@ enum DishGlossary {
         "affettati misti": "Mixed cold cuts",
         "tagliere misto": "Board of cured meats and cheeses",
         "fritto misto": "Mixed fried platter",
+        "bollito misto": "Mixed boiled meats",
         "zuppa inglese": "Custard and liqueur trifle",
         "semifreddo": "Semi-frozen dessert",
         "affogato": "Ice cream with espresso poured over",
@@ -180,6 +197,12 @@ enum DishGlossary {
         ("peperoni cruschi", "peperoni secchi croccanti"),
         ("pizza margherita", "pizza con pomodoro, mozzarella e basilico"),
         ("pinsa margherita", "pinsa con pomodoro, mozzarella e basilico"),
+        ("bollito misto", "bollito misto di carni"),
+        ("finferli", "chanterelle"), // no Italian the translator reads well: the English name passes through
+        ("spadellati", "saltati in padella"),
+        ("spadellate", "saltate in padella"),
+        ("spadellato", "saltato in padella"),
+        ("soppressa", "salame soppressa"),
         ("pici", "spaghettoni fatti a mano"),
         ("tajarin", "tagliolini all'uovo"),
         ("cinta senese", "maiale di cinta senese"),
