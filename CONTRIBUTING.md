@@ -44,6 +44,13 @@ python3 -m venv .venv && .venv/bin/pip install -r Tests/Lab/requirements.txt
 .venv/bin/python Tests/Lab/fixtures.py Tests/Lab/menus.json /tmp/lab/frames
 xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o /tmp/lab/lab
 /tmp/lab/lab /tmp/lab/frames /tmp/lab/out   # summary.md, JSON, and every frame with what it found drawn on
+
+# Real English (needs Italian under System Settings → General → Language & Region → Translation Languages)
+xcrun swiftc -O Traduci/Core/*.swift Tests/Lab/Translate/main.swift -o /tmp/lab/translate
+/tmp/lab/translate /tmp/lab/out   # translations.md, and english.json for the Simulator
+# Vision's document reader on the same pages (macOS 26)
+xcrun swiftc -O Traduci/Core/*.swift Tests/Lab/Common.swift Tests/Lab/Documents/main.swift -o /tmp/lab/documents
+/tmp/lab/documents /tmp/lab/frames /tmp/lab/out   # documents.md
 ```
 
 On pushes to this repository, the **Menu lab** workflow does the same and screenshots the app in

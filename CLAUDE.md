@@ -22,7 +22,9 @@ phone (Vision OCR, Apple Translation). README.md explains the app; CONTRIBUTING.
   point-hold-read state machine, and `Demo` launch-argument mode for the Simulator).
 - `Tests/CoreTests/` — plain-`swiftc` tests; `Fixtures/` is real OCR of real menus from the lab.
 - `Tests/Lab/` — real menus to camera-like frames (`fixtures.py`), read by the app's own OCR
-  (`main.swift`). `english.json` stands in for the translator in the Simulator.
+  (`main.swift`). `english.json` is hand-checked English that stands in for the translator in the
+  Simulator. `Translate/` runs Apple's real translator on the lab's results (Mac with the Italian
+  pack); `Documents/` compares Vision's document reader with the menu reader.
 
 ## Commands
 
@@ -38,6 +40,8 @@ python3 -m venv .venv && .venv/bin/pip install -r Tests/Lab/requirements.txt
 .venv/bin/python Tests/Lab/fixtures.py Tests/Lab/menus.json "$TMPDIR/lab/frames"
 xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$TMPDIR/lab/lab"
 "$TMPDIR/lab/lab" "$TMPDIR/lab/frames" "$TMPDIR/lab/out"
+xcrun swiftc -O Traduci/Core/*.swift Tests/Lab/Translate/main.swift -o "$TMPDIR/lab/translate"
+"$TMPDIR/lab/translate" "$TMPDIR/lab/out"   # translations.md: the English a phone would show
 
 # Simulator build (no signing), install, demo launch, screenshot
 xcodebuild build -project Traduci.xcodeproj -scheme Traduci -configuration Debug \

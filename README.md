@@ -79,17 +79,18 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 
 - The phone switches to the ultra-wide lens by itself for close-up (macro) text.
 - In a moving car or on a walk, the camera shortens its exposures while the phone shakes, and the picture is the sharpest of the last few frames, not just the last.
-- If the camera stops (a call, another app, the phone too warm in the sun), the app says so instead of waiting.
+- If the camera stops (a call, another app, the phone too warm in the sun), the app says so instead of waiting. With no text in view for a while, or in Low Power Mode, it reads the camera less often.
 - Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
 
 ## How it works
 
 ```
 aiming:   camera ─► Vision OCR, newest frame only ─► menu reader ─► translate ahead, centre first (cached)
-capture:  hold still or tap ─► freeze the recent frame that read best ─► OCR it again in two overlapping
-          bands (Vision reads at a fixed working size, so a band is a closer look: small prices come out;
-          lines a band's edge cuts through are left to the other band) ─► menu reader ─► the list, and
-          English painted over the photo in the page's own paper and ink colours
+capture:  hold still or tap ─► freeze the recent frame that read best ─► list what it read at once (mostly
+          translated already) ─► OCR it again in two overlapping bands (Vision reads at a fixed working size,
+          so a band is a closer look: small prices come out; lines a band's edge cuts through are left to
+          the other band) ─► menu reader ─► the list, and English painted over the photo in the page's own
+          paper and ink colours, running on into the blank paper beside the Italian
 menu reader: level the page ─► glue split lines ─► prices ─► dish / description / allergens / heading ─►
              columns in reading order ─► the menu's own English set aside; running text (a plaque, a
              notice) is read again as whole paragraphs
@@ -113,7 +114,7 @@ menu reader: level the page ─► glue split lines ─► prices ─► dish / 
 
 ## The menu lab
 
-Real Italian menus, run through the app's own OCR and menu reader on a Mac, and through the app itself in the iPhone Simulator. `Tests/Lab/menus.json` lists the menus (PDFs from restaurant websites, fetched when the lab runs, and one retyped from a TestFlight report). `fixtures.py` turns each page into phone-camera frames: the whole page from arm's length and closer looks, with a slight tilt, warm uneven light, blur and noise. The **Menu lab** workflow reads every frame, draws what it found, and screenshots the app on a few of them in demo mode (the Simulator has no camera and no translation models, so a picture stands in for the camera and `english.json` for the translator). Results go to a draft release named `lab`. Commits tagged `[lab]` skip TestFlight and the full build.
+Real Italian menus, run through the app's own OCR and menu reader on a Mac, and through the app itself in the iPhone Simulator. `Tests/Lab/menus.json` lists the menus (PDFs from restaurant websites, fetched when the lab runs, and one retyped from a TestFlight report). `fixtures.py` turns each page into phone-camera frames: the whole page from arm's length and closer looks, with a slight tilt, warm uneven light, blur and noise. The **Menu lab** workflow reads every frame, draws what it found, and screenshots the app on a few of them in demo mode (the Simulator has no camera and no translation models, so a picture stands in for the camera and `english.json` for the translator). On a Mac with the Italian translation pack, `Translate/` puts every menu through Apple's real translator (`translations.md`), and `Documents/` reads the pages with Vision's document reader (iOS 26 / macOS 26) for comparison with the app's menu reader (`documents.md`). Results go to a draft release named `lab`. Commits tagged `[lab]` skip TestFlight and the full build.
 
 ## Contributing
 

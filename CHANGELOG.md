@@ -2,6 +2,25 @@
 
 Builds ship through TestFlight; the build number is the number of the workflow run that uploaded it.
 
+## Build 21.1 — 28 September 2026
+
+**Faster to the list, easier to read on the picture.**
+
+- **"The picture didn't come", again and again:** the retry restarted the camera only when it had
+  stopped. Now it also restarts a camera that runs but sends no frames, and cancels a text read
+  that has hung. Dropped frames are logged, so a next report says why.
+- **The list shows up with the picture.** The frame's own reading, mostly translated while you
+  aimed, is listed at once; the closer reading (prices, small print) comes in a moment later, and
+  the entries both found stay where they are.
+- **The English on the photo stays readable:** at the Italian's size, running on into the blank
+  paper beside it up to the price column, instead of shrinking to fit the Italian's width. A long
+  line ends in "…"; the list has it in full.
+- **Allergens under a price on its own line** stay with their dish instead of becoming an entry.
+- **Cooler and lighter on the battery:** with no text in view for a couple of seconds (the phone on
+  the table), or in Low Power Mode, the camera is read less often.
+- **The menu lab** now translates every menu for real with Apple's translator on the Mac, and tries
+  Vision's new document reader on the same pages for comparison.
+
 ## Build 20.1 — 28 September 2026
 
 **Five TestFlight reports from a day in Chianti.**
