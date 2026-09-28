@@ -156,12 +156,13 @@ struct CaptionPatches: View {
         ZStack(alignment: .topLeading) {
             if caption.paintsTitle, let title = caption.title {
                 let text = sameLine && allDetails ? title + ": " + details.joined(separator: ", ") : title
-                PrintedText(text: text, rect: titleRect, room: room(from: entry.titleBox),
+                PrintedText(text: text, rect: titleRect, room: room(from: entry.titleBox, lines: titleLines),
                             lines: max(1, titleLines), colors: caption.colors)
             }
             if allDetails, !sameLine {
+                let detailLines = max(1, entry.lineCount - titleLines)
                 PrintedText(text: details.joined(separator: " · "), rect: mapper.viewRect(for: detailBox),
-                            room: room(from: detailBox), lines: max(1, entry.lineCount - titleLines), colors: caption.colors)
+                            room: room(from: detailBox, lines: detailLines), lines: detailLines, colors: caption.colors)
             }
             let target = mapper.viewRect(for: entry.box).insetBy(dx: -4, dy: -3)
             Color.clear
@@ -181,9 +182,11 @@ struct CaptionPatches: View {
         }
     }
 
-    /// How wide the English may run from `box`'s left edge, in points.
-    private func room(from box: CGRect) -> CGFloat {
-        mapper.viewRect(for: CGRect(x: box.minX, y: box.minY, width: max(caption.roomRight - box.minX, box.width), height: box.height)).width
+    /// How wide the English may run from `box`'s left edge, in points. Only a single line runs on
+    /// past the Italian; a paragraph wraps within its own width, as printed.
+    private func room(from box: CGRect, lines: Int) -> CGFloat {
+        guard lines <= 1 else { return mapper.viewRect(for: box).width }
+        return mapper.viewRect(for: CGRect(x: box.minX, y: box.minY, width: max(caption.roomRight - box.minX, box.width), height: box.height)).width
     }
 
     private var titleLines: Int {

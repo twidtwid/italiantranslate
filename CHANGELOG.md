@@ -12,9 +12,10 @@ Builds ship through TestFlight; the build number is the number of the workflow r
 - **The list shows up with the picture.** The frame's own reading, mostly translated while you
   aimed, is listed at once; the closer reading (prices, small print) comes in a moment later, and
   the entries both found stay where they are.
-- **The English on the photo stays readable:** at the Italian's size, running on into the blank
-  paper beside it up to the price column, instead of shrinking to fit the Italian's width. A long
-  line ends in "…"; the list has it in full.
+- **The English on the photo stays readable:** at the Italian's size. A one-line name or
+  description runs on into the blank paper beside it, up to the price column, instead of shrinking
+  to fit the Italian's width; a paragraph wraps as printed. Too long, it ends in "…"; the list has
+  it in full.
 - **Allergens under a price on its own line** stay with their dish instead of becoming an entry.
 - **Cooler and lighter on the battery:** with no text in view for a couple of seconds (the phone on
   the table), or in Low Power Mode, the camera is read less often.
