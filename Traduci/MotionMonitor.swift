@@ -12,6 +12,8 @@ final class MotionMonitor {
         var degreesFromMark: Double
         /// A deliberate move: a quick turn or a jolt, not hand tremor or a tap on the screen.
         var movedSharply: Bool
+        /// More than a hand's tremor: a moving car, a walk. Long exposures blur.
+        var shaking: Bool
     }
 
     // Tuning, generous on purpose: an arm held out over a menu shakes more than a phone at rest.
@@ -20,6 +22,8 @@ final class MotionMonitor {
     static let stillAcceleration = 0.12 // g
     static let sharpTurnRate = 0.9 // rad/s: re-aiming, not drifting
     static let sharpJolt = 0.35 // g
+    static let shakeRate = 0.35 // rad/s
+    static let shakeAcceleration = 0.15 // g
 
     var onReading: ((Reading) -> Void)?
 
@@ -59,7 +63,8 @@ final class MotionMonitor {
         onReading?(Reading(
             steadyFor: steadySince.map { motion.timestamp - $0 } ?? 0,
             degreesFromMark: degrees,
-            movedSharply: rate > Self.sharpTurnRate || acceleration > Self.sharpJolt
+            movedSharply: rate > Self.sharpTurnRate || acceleration > Self.sharpJolt,
+            shaking: rate > Self.shakeRate || acceleration > Self.shakeAcceleration
         ))
     }
 }

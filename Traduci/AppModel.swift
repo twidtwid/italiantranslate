@@ -47,6 +47,8 @@ final class AppModel {
     private(set) var captureProgress: Double = 0
     /// Italian text in view right now (aiming).
     private(set) var textInView = false
+    /// Something to tell the user over the camera: it stopped, or a picture didn't come.
+    private(set) var notice: String?
     private(set) var stillImage: CGImage?
     /// The captured page in reading order.
     private(set) var captions: [Caption] = []
@@ -72,6 +74,13 @@ final class AppModel {
     @ObservationIgnored private var stableFrames = 0
     @ObservationIgnored private var textSince: TimeInterval?
     @ObservationIgnored private var steadyFor: TimeInterval = 0
+    /// When the pending still was asked for: the watchdog's ticket.
+    @ObservationIgnored private var captureStarted: TimeInterval = 0
+    @ObservationIgnored private var shakingSince: TimeInterval?
+    @ObservationIgnored private var calmSince: TimeInterval?
+    @ObservationIgnored private var shortExposure = false
+    /// The system has the camera (a call, another app, the phone too warm): no frames are coming.
+    @ObservationIgnored private var interrupted = false
 
     init() {
         if let demo { engine.useCanned(demo.translations) }
@@ -95,6 +104,9 @@ final class AppModel {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated { self.handleStill(result) }
             }
+        }
+        camera.onInterruption = { [weak self] message in
+            MainActor.assumeIsolated { self?.cameraInterrupted(message) } // delivered on the main queue
         }
         motion.onReading = { [weak self] reading in
             MainActor.assumeIsolated { self?.handleMotion(reading) } // delivered on the main queue
@@ -133,10 +145,56 @@ final class AppModel {
 
     /// The shutter: take the picture now.
     func capture() {
-        guard mode == .aiming, !isCapturing else { return }
+        guard mode == .aiming, !isCapturing, !interrupted else { return }
         isCapturing = true
         captureProgress = 1
+        notice = nil
+        let started = ProcessInfo.processInfo.systemUptime
+        captureStarted = started
         camera.takeStill()
+        Task { [weak self] in
+            // A still comes within a frame or two. Overdue, get frames coming again; much later,
+            // give up with a word rather than sit on "Reading…".
+            try? await Task.sleep(for: .seconds(2))
+            guard let self, self.isCapturing, self.captureStarted == started else { return }
+            self.camera.recover()
+            try? await Task.sleep(for: .seconds(3))
+            guard self.isCapturing, self.captureStarted == started else { return }
+            self.cancelCapture()
+            self.show("The picture didn't come. Try again.")
+        }
+    }
+
+    /// Stop waiting for a still: back to aiming, with the camera reading again, and no instant
+    /// retry (the user taps again, or moves).
+    private func cancelCapture() {
+        isCapturing = false
+        captureProgress = 0
+        stableFrames = 0
+        textSince = nil
+        autoCaptureArmed = false
+        disarmedAt = ProcessInfo.processInfo.systemUptime
+        motion.mark()
+        camera.resume()
+    }
+
+    /// A word over the camera for a few seconds.
+    private func show(_ message: String) {
+        notice = message
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            if self?.notice == message { self?.notice = nil }
+        }
+    }
+
+    /// The system took the camera (a call, another app, a phone too warm), or gave it back (nil).
+    private func cameraInterrupted(_ message: String?) {
+        interrupted = message != nil
+        notice = message
+        guard interrupted else { return }
+        textInView = false // what was in view is gone with the camera
+        captureProgress = 0
+        if isCapturing { cancelCapture() }
     }
 
     /// Back to the live camera. The only way out of reading: nothing else ends it.
@@ -160,8 +218,10 @@ final class AppModel {
     }
 
     private func freeze(on image: CGImage) {
-        guard isCapturing else { return }
+        // Only ever asked for while aiming; a late one, after the watchdog gave up, is still wanted.
+        guard mode == .aiming else { return }
         isCapturing = false
+        notice = nil
         stillImage = image
         imageSize = CGSize(width: image.width, height: image.height)
         captions = []
@@ -210,11 +270,32 @@ final class AppModel {
 
     private func handleMotion(_ reading: MotionMonitor.Reading) {
         steadyFor = reading.steadyFor
+        adjustExposure(shaking: reading.shaking)
         guard mode == .aiming else { return } // reading ignores motion entirely
         if !autoCaptureArmed, reading.degreesFromMark > Self.turnToRearm || reading.movedSharply {
             autoCaptureArmed = true
         }
         updateCaptureProgress(now: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// A phone that keeps shaking (a moving car, a walk) gets short exposures: grainier frames, but
+    /// sharp ones. Back to normal once it has been calm for a moment.
+    private func adjustExposure(shaking: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if shaking {
+            calmSince = nil
+            shakingSince = shakingSince ?? now
+        } else {
+            shakingSince = nil
+            calmSince = calmSince ?? now
+        }
+        if !shortExposure, let since = shakingSince, now - since > 0.4 {
+            shortExposure = true
+            camera.setShortExposure(true)
+        } else if shortExposure, let since = calmSince, now - since > 2 {
+            shortExposure = false
+            camera.setShortExposure(false)
+        }
     }
 
     private func updateCaptureProgress(now: TimeInterval) {
@@ -223,7 +304,7 @@ final class AppModel {
             captureProgress = textInView ? 0.6 : 0
             return
         }
-        guard autoCaptureArmed, textInView else {
+        guard autoCaptureArmed, textInView, !interrupted else {
             captureProgress = 0
             return
         }

@@ -117,6 +117,38 @@ do {
            && !TextNormalizer.startsListItem("2,50 €"), "list markers are recognised, numbers aren't")
     expect(TextNormalizer.similarity("Uscita di sicurezza", "Usclta di sicurezza") > 0.8, "a one-letter misread is still the same text")
     expect(TextNormalizer.similarity("Uscita", "Ingresso") < 0.3, "different words aren't")
+    let rampa = "La rampa elicoidale che solo a spirale verso la vigna è untopera scuttorea che deve essere"
+    expect(TextNormalizer.containment("La rempo elicoidalo che solo a spirato vorso", in: rampa) >= 0.7,
+           "a misread piece of a line is mostly in the line")
+    expect(TextNormalizer.containment("percorsa con attenzione perché i gradini di differente altezza", in: rampa) < 0.5,
+           "the next line isn't")
+}
+
+// MARK: Reading in bands
+
+do {
+    // A line the lower band's top edge cuts through was read from half its letters: it goes. The
+    // upper band, which overlaps this one, has it whole.
+    let lowerBand = CGRect(x: 0, y: 0.47, width: 1, height: 0.53)
+    let cut = OCRLine(text: "La rempo elicoidalo che solo a spirato vorso", box: CGRect(x: 0.1, y: 0.47, width: 0.4, height: 0.012))
+    let whole = OCRLine(text: "Visita guidata", box: CGRect(x: 0.1, y: 0.60, width: 0.3, height: 0.02))
+    expect(OCRTiles.droppingCut([cut, whole], in: lowerBand) == [whole], "a line cut by a band's inner edge goes")
+    expect(OCRTiles.droppingCut([cut, whole], in: CGRect(x: 0, y: 0, width: 1, height: 1)) == [cut, whole],
+           "the image's own edges cut nothing")
+
+    // A misread piece of a line and the whole line, read in different passes: one line.
+    let rampa = OCRLine(text: "La rampa elicoidale che solo a spirale verso la vigna è untopera scuttorea che deve essere",
+                        box: CGRect(x: 0.05, y: 0.40, width: 0.9, height: 0.03))
+    let piece = OCRLine(text: "La rempo elicoidalo che solo a spirato vorso", box: CGRect(x: 0.05, y: 0.405, width: 0.45, height: 0.022))
+    expect(OCRTiles.merge([[piece], [rampa]]) == [rampa], "the misread piece gives way to the whole line")
+    expect(OCRTiles.merge([[rampa], [piece]]) == [rampa], "whichever pass read it first")
+    let next = OCRLine(text: "percorsa con attenzione perché i gradini di differente altezza",
+                       box: CGRect(x: 0.05, y: 0.425, width: 0.9, height: 0.03))
+    expect(OCRTiles.merge([[rampa], [next]]).count == 2, "the next line down stays")
+    let tilted = OCRLine(text: "percorsa con attenzione perché i gradini di differente",
+                         box: CGRect(x: 0.05, y: 0.41, width: 0.9, height: 0.05),
+                         corners: [CGPoint(x: 0.05, y: 0.435), CGPoint(x: 0.95, y: 0.41), CGPoint(x: 0.95, y: 0.435), CGPoint(x: 0.05, y: 0.46)])
+    expect(OCRTiles.merge([[rampa], [tilted]]).count == 2, "a slanted neighbour whose box overlaps stays too")
 }
 
 // MARK: Prices
@@ -139,6 +171,14 @@ do {
     expect(Price.tidy("€ 5 /€ 15") == "€5 / €15", "glass and bottle")
     expect(Price.tidy("€ 1.50 cadauna") == "€1.50 each", "each")
     expect(Price.tidy("9,5") == "€9.50", "one decimal")
+    for price in ["€ 12", "EURO 8", "13,00", "13,00 €", "€34"] {
+        expect(Price.isMarked(price), "\(price) is plainly a price")
+    }
+    for number in ["13", "117", "C18"] {
+        expect(!Price.isMarked(number), "\(number) is a price only on a menu")
+    }
+    expect(Price.split("seguono il percorso. È lunga 101", bareNumbers: false).price == nil, "prose keeps its numbers")
+    expect(Price.split("Coperto € 2,50", bareNumbers: false) == ("Coperto", "€ 2,50"), "a marked price still comes off")
 }
 
 // MARK: Menu reading: plain text and signs keep working
@@ -189,6 +229,28 @@ do {
         line("COSA FARE IN CASO DI INCENDIO", 0.1, 0.30, 0.6, 0.030),
         line("IN CASO DI INCENDIO NELLA VOSTRA CAMERA", 0.1, 0.335, 0.6, 0.022),
     ]).count == 2, "heading and subtitle stay separate")
+
+    // A plaque (TestFlight report): sentences, not dishes. The paragraph is read whole, one piece
+    // to translate and no name-and-description split, and a number ending a line isn't a price.
+    let plaque = read([
+        line("La rampa elicoidale che solo a spirale verso la vigna è un'opera", 0.08, 0.300, 0.84),
+        line("scultorea che deve essere percorsa con attenzione perché i gradini,", 0.08, 0.325, 0.84),
+        line("di differente altezza, seguono il percorso ascendente. È lunga 101", 0.08, 0.350, 0.84),
+        line("metri e sale attraverso 117", 0.08, 0.375, 0.40),
+        line("gradini fino alla terrazza.", 0.08, 0.400, 0.35),
+    ])
+    expect(plaque.count == 1 && plaque.first?.kind == .text && plaque.first?.details.isEmpty == true
+           && plaque.first?.price == nil, "one paragraph, no dish, no price: \(plaque.map(\.title)) \(plaque.map(\.price))")
+    expect(plaque.first?.title.hasSuffix("ascendente. È lunga 101 metri e sale attraverso 117 gradini fino alla terrazza.") == true,
+           "the numbers stay in the text: \(plaque.first?.title ?? "")")
+
+    // …but one dish close up, its price a bare number, is still a dish.
+    let closeUp = read([
+        line("Capasanta arrostita", 0.10, 0.200, 0.24, 0.020),
+        line("limoncello, aglio orsino, fragole 13", 0.10, 0.224, 0.30, 0.015),
+    ])
+    expect(closeUp.first?.price == "€13" && closeUp.first?.details == ["limoncello, aglio orsino, fragole"],
+           "a dish close up keeps its name, what's in it and its price: \(closeUp)")
 }
 
 // MARK: Menu reading: dishes, prices, descriptions
@@ -333,6 +395,14 @@ do {
     tartare.english["Angolo"] = "Corner"
     expect(tartare.paintsTitle && tartare.showsItalian && !tartare.isTranslated, "title in, details still coming")
     expect(Caption(id: 2, entry: dishes[2]).title == "Welcome", "English on the page is its own translation")
+    var paragraph = Caption(id: 3, entry: MenuEntry(kind: .text, title: "La rampa elicoidale sale verso la vigna con gradini di altezza diversa.",
+                                                    details: [], price: nil, isForeign: false, titleBox: .zero, box: .zero, lineCount: 2))
+    paragraph.english[paragraph.entry.title] = "The helical ramp climbs toward the vineyard with steps of different heights."
+    expect(paragraph.paintsTitle && !paragraph.showsItalian, "a paragraph isn't repeated in Italian under its English")
+    var sign = Caption(id: 4, entry: MenuEntry(kind: .text, title: "Uscita di sicurezza", details: [], price: nil, isForeign: false,
+                                               titleBox: .zero, box: .zero, lineCount: 1))
+    sign.english["Uscita di sicurezza"] = "Emergency exit"
+    expect(sign.showsItalian, "a sign's few words are, to match it on the wall")
 
     var page = dishes.prefix(2).map { $0 }
     page[0].title = "Tartare di manzo con funghi saltati"

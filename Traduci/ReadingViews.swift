@@ -94,6 +94,7 @@ struct PhotoView: View {
                 CaptionPatches(caption: caption, mapper: mapper, focused: caption.id == model.focusedID) {
                     model.focus(caption.id, fromList: false)
                 }
+                .zIndex(caption.id == model.focusedID ? 1 : 0) // the picked one over its neighbours
             }
             if model.isReadingPage {
                 ReadingSweep()

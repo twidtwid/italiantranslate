@@ -30,9 +30,19 @@ struct MenuEntry: Equatable {
 /// Reads a page of OCR lines the way a diner does: which lines are one dish, which are its
 /// description, which price goes with it, what's a section heading, which lines are the menu's
 /// own English, and in what order the columns go. Pure geometry and text, so it's testable.
+/// A page that turns out to be running text (a plaque, a notice) is read again as paragraphs.
 enum MenuReader {
     static func entries(from lines: [OCRLine], aspect: CGFloat = 16.0 / 9.0,
                         language: (String) -> TextLanguage = { _ in .unknown }) -> [MenuEntry] {
+        let menu = read(lines, aspect: aspect, language: language, prose: false)
+        guard isProse(menu.entries, markedPrices: menu.markedPrices) else { return menu.entries }
+        return read(lines, aspect: aspect, language: language, prose: true).entries
+    }
+
+    /// One reading of the page. As `prose`, each paragraph is one entry, read whole (no name and
+    /// description), and only a price with a currency or cents is a price: "lunga 101" isn't.
+    private static func read(_ lines: [OCRLine], aspect: CGFloat, language: (String) -> TextLanguage,
+                             prose: Bool) -> (entries: [MenuEntry], markedPrices: Int) {
         var rows = lines.compactMap { line -> Row? in
             let text = TextNormalizer.collapseWhitespace(line.text)
             guard !text.isEmpty, line.box.width > 0, line.box.height > 0 else { return nil }
@@ -43,15 +53,18 @@ enum MenuReader {
 
         var prices: [Row] = []
         var texts: [Row] = []
+        var markedPrices = 0
         for row in rows {
-            if Price.isWholeLine(row.text) {
+            if Price.isWholeLine(row.text), !prose || Price.isMarked(row.text) {
                 prices.append(row)
+                if Price.isMarked(row.text) { markedPrices += 1 }
                 continue
             }
-            let (text, price) = Price.split(row.text)
+            let (text, price) = Price.split(row.text, bareNumbers: !prose)
             row.text = text
             row.ownPrice = price
             row.language = language(text)
+            if let price, Price.isMarked(price) { markedPrices += 1 }
             if TextNormalizer.isWorthTranslating(text) { texts.append(row) }
         }
         texts.sort { ($0.top, $0.left) < ($1.top, $1.left) }
@@ -60,7 +73,31 @@ enum MenuReader {
 
         let groups = group(texts)
         attach(prices, to: groups)
-        return order(groups).compactMap { entry(from: $0, medianHeight: medianHeight) }
+        let entries = order(groups).compactMap { entry(from: $0, medianHeight: medianHeight, prose: prose) }
+        return (entries, markedPrices)
+    }
+
+    /// Running text (a plaque, a notice, a museum sign) rather than a menu: no courses, hardly a
+    /// price with a currency or cents, and sentences.
+    static func isProse(_ entries: [MenuEntry], markedPrices: Int) -> Bool {
+        if entries.contains(where: { $0.kind == .heading && isSection($0.title) }) { return false }
+        let listed = entries.filter { $0.kind != .heading && !$0.isForeign }
+        guard markedPrices * 3 < listed.count else { return false }
+        return listed.contains { entry in
+            let text = ([entry.title] + entry.details).joined(separator: " ")
+            return text.split(separator: " ").count >= 12 && endsSentence(text)
+        }
+    }
+
+    /// "…il percorso ascendente. È lunga…", "…fino alla terrazza.": a sentence ends in it.
+    static func endsSentence(_ text: String) -> Bool {
+        let characters = Array(text.trimmingCharacters(in: .whitespaces))
+        guard let last = characters.last else { return false }
+        if ".!?".contains(last) { return true }
+        for index in characters.indices.dropLast(2) where ".!?".contains(characters[index]) {
+            if characters[index + 1] == " ", characters[index + 2].isUppercase { return true }
+        }
+        return false
     }
 
     // MARK: - Rows
@@ -344,11 +381,12 @@ enum MenuReader {
 
     // MARK: - Entries
 
-    static func entry(from group: Group, medianHeight: CGFloat) -> MenuEntry? {
-        let (titleRows, chunks) = splitTitle(group.rows)
+    static func entry(from group: Group, medianHeight: CGFloat, prose: Bool = false) -> MenuEntry? {
+        let split = prose ? (title: group.rows, chunks: [[Row]]()) : splitTitle(group.rows)
+        let titleRows = split.title, chunks = split.chunks
         var title = TextNormalizer.removingListMarker(join(titleRows.map(\.text)))
         var details = chunks.map { join($0.map(\.text)) }
-        if details.isEmpty, let colon = title.firstIndex(of: ":") {
+        if !prose, details.isEmpty, let colon = title.firstIndex(of: ":") {
             // "CROSTONE: pecorino senese, noci…": a name, then what's in it.
             let name = title[..<colon].trimmingCharacters(in: .whitespaces)
             let rest = title[title.index(after: colon)...].trimmingCharacters(in: .whitespaces)
@@ -454,6 +492,12 @@ enum Price {
         pattern: #"^(.*?[^\s.·…_])\s*(?:[.·…_]{2,}\s*)?(\#(currency)\s*\#(number)\#(qualifier)|\d{1,3}[.,]\d{2}\s*\#(currency)?\#(qualifier)|\d{1,3}\s*\#(currency)\#(qualifier)|(?<=[a-zà-ÿ)"”'’])\s\d{1,3})\s*$"#,
         options: [.caseInsensitive]
     )
+    /// `trailing` without the bare number after a word.
+    private static let trailingMarked = try! NSRegularExpression(
+        pattern: #"^(.*?[^\s.·…_])\s*(?:[.·…_]{2,}\s*)?(\#(currency)\s*\#(number)\#(qualifier)|\d{1,3}[.,]\d{2}\s*\#(currency)?\#(qualifier)|\d{1,3}\s*\#(currency)\#(qualifier))\s*$"#,
+        options: [.caseInsensitive]
+    )
+    private static let marked = try! NSRegularExpression(pattern: #"€|\beur|\d[.,]\d{2}\b"#, options: [.caseInsensitive])
 
     /// The whole line is a price ("€ 12", "EURO 18", "11,00", "C18" for a misread "€18").
     static func isWholeLine(_ text: String) -> Bool {
@@ -461,9 +505,16 @@ enum Price {
         return wholeLine.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
     }
 
+    /// With a currency or cents: "€ 12", "EURO 8", "13,00". A bare "13" is a price only on a menu.
+    static func isMarked(_ price: String) -> Bool {
+        marked.firstMatch(in: price, range: NSRange(price.startIndex..., in: price)) != nil
+    }
+
     /// "Dolce del giorno € 6.00" → ("Dolce del giorno", "€ 6.00"); no price → (text, nil).
-    static func split(_ text: String) -> (text: String, price: String?) {
-        guard let match = trailing.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+    /// Without `bareNumbers`, "fragole 13" keeps its number: only a marked price comes off.
+    static func split(_ text: String, bareNumbers: Bool = true) -> (text: String, price: String?) {
+        let pattern = bareNumbers ? trailing : trailingMarked
+        guard let match = pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
               let textRange = Range(match.range(at: 1), in: text),
               let priceRange = Range(match.range(at: 2), in: text) else { return (text, nil) }
         let rest = text[textRange].trimmingCharacters(in: CharacterSet(charactersIn: " :-–"))

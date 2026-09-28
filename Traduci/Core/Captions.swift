@@ -28,8 +28,10 @@ struct Caption: Identifiable, Equatable {
         return !TextNormalizer.isEffectivelySame(entry.title, title)
     }
 
-    /// The Italian is worth showing under the English: it says something the English doesn't.
+    /// The Italian is worth showing under the English: it says something the English doesn't. A
+    /// name to order by or a sign to match, yes; a paragraph of a plaque is on the picture already.
     var showsItalian: Bool {
+        if entry.kind == .text, entry.title.split(separator: " ").count > 8 { return false }
         guard !entry.isForeign, let title else { return !entry.isForeign }
         return !TextNormalizer.isEffectivelySame(entry.title, title)
     }

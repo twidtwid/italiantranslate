@@ -86,6 +86,7 @@ struct ContentView: View {
 
     private var hint: String? {
         guard model.cameraState == .running else { return nil }
+        if let notice = model.notice { return notice }
         if model.isCapturing { return "Reading…" }
         return model.textInView ? "Hold still, or tap to translate" : "Point at a menu or a sign"
     }
