@@ -9,3 +9,4 @@ node_modules/
 lab-results/
 *.p8
 *_private.pem
+.venv-bench/

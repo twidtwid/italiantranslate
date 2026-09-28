@@ -2,6 +2,22 @@
 
 Builds ship through TestFlight; the build number is the number of the workflow run that uploaded it.
 
+## Build 22.1 — 28 September 2026
+
+**The right price, and dishes by their real names.**
+
+- **Allergen numbers aren't prices:** a dish with its allergen numbers on a line of their own and
+  the price under them ("1, 7", then "€16.00") showed €1.70. The price with a currency or cents now
+  wins over a bare number.
+- **No more half-lines:** where the camera frame read one printed line as two pieces and the closer
+  reading got it whole, the second piece stayed in the list as nonsense ("con uno sguardo").
+- **Dishes the translator doesn't know** come out right: "Ribollita" was "Boiled", "Fagioli
+  all'uccelletto" "Bird beans", "Secondi" "Seconds" and "Coperto" "Covered". A glossary of dishes,
+  course headings and kitchen words fixes these, still entirely on the phone.
+- **Other translators, measured:** Gemma 4, TranslateGemma, Qwen3.5 and Opus-MT, all small enough
+  for an iPhone, against Apple's translator on 499 menu lines. None is more accurate and all are
+  much slower, so Apple's stays ([docs/translation-benchmark.md](docs/translation-benchmark.md)).
+
 ## Build 21.1 — 28 September 2026
 
 **Faster to the list, easier to read on the picture.**
