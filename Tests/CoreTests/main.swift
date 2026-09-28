@@ -150,11 +150,21 @@ do {
                          corners: [CGPoint(x: 0.05, y: 0.435), CGPoint(x: 0.95, y: 0.41), CGPoint(x: 0.95, y: 0.435), CGPoint(x: 0.05, y: 0.46)])
     expect(OCRTiles.merge([[rampa], [tilted]]).count == 2, "a slanted neighbour whose box overlaps stays too")
 
-    // Two whole readings of one allergen line (the lab's casadelconte page): the surer one stays.
-    let blurred = OCRLine(text: "alutine. cesce", box: CGRect(x: 0.101, y: 0.671, width: 0.108, height: 0.008), confidence: 0.5)
-    let sharp = OCRLine(text: "glutine, pesce", box: CGRect(x: 0.098, y: 0.671, width: 0.113, height: 0.010), confidence: 1)
-    expect(OCRTiles.merge([[blurred], [sharp]]) == [sharp] && OCRTiles.merge([[sharp], [blurred]]) == [sharp],
-           "the surer reading wins, whichever pass made it")
+    // Two readings of one allergen line (the lab's casadelconte page), the same length: the band's
+    // closer look comes second and wins; a surer one wins whichever pass made it.
+    let blurred = OCRLine(text: "alutine. cesce", box: CGRect(x: 0.101, y: 0.671, width: 0.108, height: 0.008))
+    let sharp = OCRLine(text: "glutine, pesce", box: CGRect(x: 0.098, y: 0.671, width: 0.113, height: 0.010))
+    expect(OCRTiles.merge([[blurred], [sharp]]) == [sharp], "the closer look wins")
+    var unsure = blurred
+    unsure.confidence = 0.5
+    expect(OCRTiles.merge([[sharp], [unsure]]) == [sharp], "an unsure reading doesn't")
+    // The same text read twice keeps its first box; a reading that lost the price at the end doesn't win.
+    var again = sharp
+    again.box.size.height = 0.016
+    expect(OCRTiles.merge([[sharp], [again]]).first?.box == sharp.box, "the same text keeps its first box")
+    let priced = OCRLine(text: "fragole, aceto balsamico 7", box: CGRect(x: 0.548, y: 0.434, width: 0.339, height: 0.019))
+    let unpriced = OCRLine(text: "fragole, aceto balsamico", box: CGRect(x: 0.550, y: 0.434, width: 0.313, height: 0.018))
+    expect(OCRTiles.merge([[priced], [unpriced]]) == [priced], "the reading with the price stays")
 }
 
 // MARK: Prices
