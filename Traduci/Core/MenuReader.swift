@@ -71,7 +71,7 @@ enum MenuReader {
         let italianHeights = texts.filter { $0.language != .foreign }.map(\.height).sorted()
         let medianHeight = italianHeights.isEmpty ? 0.01 : italianHeights[italianHeights.count / 2]
 
-        let groups = group(texts)
+        let groups = group(texts, prices: prices)
         attach(prices, to: groups)
         let entries = order(groups).compactMap { entry(from: $0, medianHeight: medianHeight, prose: prose) }
         return (entries, markedPrices)
@@ -110,6 +110,8 @@ enum MenuReader {
         let corners: [CGPoint]
         var language: TextLanguage = .unknown
         var ownPrice: String?
+        /// Comes after a price printed on a line of its own: the dish's next part (the allergens).
+        var followsPrice = false
         // Where the line sits once the page is turned level, and how tall its type really is.
         var left: CGFloat
         var right: CGFloat
@@ -230,19 +232,25 @@ enum MenuReader {
         var right: CGFloat { rows.map(\.right).max() ?? 0 }
     }
 
-    static func group(_ rows: [Row]) -> [Group] {
+    static func group(_ rows: [Row], prices: [Row] = []) -> [Group] {
         var groups: [Group] = []
         for row in rows {
             var best: Group?
             var bestGap = CGFloat.greatestFiniteMagnitude
+            var bestFollowsPrice = false
             for group in groups {
                 let last = group.last
-                let gap = row.top - last.bottom
+                var gap = row.top - last.bottom
                 let small = min(last.height, row.height)
+                // A price on its own line between them ("…al miele" / "10" / "latte, frutta a guscio")
+                // fills the gap, but only a line that reads on carries the dish past its price.
+                let price = TextNormalizer.readsAsContinuation(last.text, row.text) ? priceBetween(last, row, in: prices) : nil
+                if let price { gap = row.top - price.bottom }
                 let reach: CGFloat = TextNormalizer.endsOpen(last.text) ? 1.6 : 1.0 // "…di vitello," carries on
                 guard gap > -0.5 * small, gap < reach * small, aligned(last, row), gap < bestGap else { continue }
                 best = group
                 bestGap = gap
+                bestFollowsPrice = price != nil
             }
             if row.language == .foreign {
                 if let best, best.isForeign || best.last === best.rows.last || !best.foreign.isEmpty {
@@ -254,6 +262,7 @@ enum MenuReader {
                 continue
             }
             if let best, !best.isForeign, best.last === best.rows.last, continues(best, with: row) {
+                row.followsPrice = bestFollowsPrice
                 best.rows.append(row)
                 best.last = row
                 if best.price == nil { best.price = row.ownPrice }
@@ -262,6 +271,15 @@ enum MenuReader {
             }
         }
         return groups
+    }
+
+    /// A price line in the space between `above` and `below`, under `above`'s text.
+    static func priceBetween(_ above: Row, _ below: Row, in prices: [Row]) -> Row? {
+        prices.first { price in
+            price.top > above.bottom - 0.5 * price.height && price.bottom < below.top + 0.5 * price.height
+                && price.top - above.bottom < price.height
+                && price.centerX > above.left - 0.02 && price.centerX < above.right + 0.02
+        }
     }
 
     /// Left, centre or right edges line up: one paragraph, one dish, one centred block.
@@ -328,7 +346,9 @@ enum MenuReader {
             }
             if target == nil {
                 for group in groups where !group.isForeign {
-                    let gap = price.top - group.bottom
+                    // Under the dish, or inside it: a line of its own between description and allergens.
+                    let inside = price.top > group.top && price.bottom < group.bottom
+                    let gap = inside ? 0 : price.top - group.bottom
                     guard gap >= -0.5 * price.height, gap < 1.6 * price.height,
                           price.centerX >= group.left - 0.02, price.centerX <= group.right + 0.02,
                           gap < best else { continue }
@@ -417,7 +437,7 @@ enum MenuReader {
         guard let first = rows.first else { return ([], []) }
         var title = [first]
         for row in rows.dropFirst() {
-            guard let previous = title.last, previous.ownPrice == nil else { break }
+            guard let previous = title.last, previous.ownPrice == nil, !row.followsPrice else { break }
             if !TextNormalizer.endsOpen(previous.text) {
                 let reference = title.max { $0.raw.count < $1.raw.count } ?? previous // longest line shows the type best
                 // A name wraps on in the same type; a line with a comma under a name is what's in it
@@ -430,7 +450,7 @@ enum MenuReader {
         }
         var chunks: [[Row]] = []
         for row in rows.dropFirst(title.count) {
-            if let previous = chunks.last?.last, previous.ownPrice == nil,
+            if let previous = chunks.last?.last, previous.ownPrice == nil, !row.followsPrice,
                sameSize.contains(sizeRatio(previous, row)), !TextNormalizer.startsListItem(row.text) {
                 chunks[chunks.count - 1].append(row)
             } else {

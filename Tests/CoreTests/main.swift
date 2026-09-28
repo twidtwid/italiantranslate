@@ -378,6 +378,14 @@ do {
     expect(entry(conte, "Quaglia arrosto")?.details.first == "polenta, silene" && entry(conte, "Quaglia arrosto")?.price == "€15",
            "ingredients under a name aren't part of it")
 
+    // As a capture reads it, the bands find the price the menu prints on a line of its own between
+    // the ingredients and the allergens: the allergens stay with the dish.
+    let conteCapture = fixture("casadelconte-p1-middle-capture")
+    let risotto = entry(conteCapture, "Risotto al Blu del Birraio")
+    expect(risotto?.price == "€10" && risotto?.details == ["asparagi, ricotta di mandorle al miele", "latte, frutta a guscio"],
+           "a price on its own line inside a dish: \(String(describing: risotto))")
+    expect(!conteCapture.contains { $0.title == "latte, frutta a guscio" }, "the allergens aren't an entry of their own")
+
     let piccadilly = fixture("piccadilly-p1-top") // Italian with English under each dish, prices on the right
     expect(piccadilly.filter { $0.kind == .item }.count >= 18, "dishes priced: \(piccadilly.filter { $0.kind == .item }.count)")
     expect(entry(piccadilly, "Melanzane alla parmigiana")?.price == "€14.00", "Melanzane alla parmigiana €14.00")
