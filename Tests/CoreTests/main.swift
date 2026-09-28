@@ -380,6 +380,12 @@ do {
 
     // As a capture reads it, the bands find the price the menu prints on a line of its own between
     // the ingredients and the allergens: the allergens stay with the dish.
+    // Centred dishes with their allergen numbers on a line of their own, then the price: "1, 7" is
+    // not €1.70, and the lone "7" is not €7.
+    let santIlario = fixture("santilario-p2-page")
+    let prices = santIlario.filter { $0.kind == .item }.map { $0.price ?? "none" }
+    expect(prices == ["€19.00", "€16.00", "€16.00", "€18.00", "€16.00"], "the prices, not the allergen numbers: \(prices)")
+
     let conteCapture = fixture("casadelconte-p1-middle-capture")
     let risotto = entry(conteCapture, "Risotto al Blu del Birraio")
     expect(risotto?.price == "€10" && risotto?.details == ["asparagi, ricotta di mandorle al miele", "latte, frutta a guscio"],
