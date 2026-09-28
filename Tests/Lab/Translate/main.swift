@@ -47,7 +47,11 @@ var milliseconds: [Double] = []
 @MainActor func translate(_ text: String) async -> String {
     if let known = cache[text] { return known }
     let started = Date()
-    let result = (try? await session.translate(TextNormalizer.translationInput(text)).targetText) ?? "(failed)"
+    let result: String
+    switch DishGlossary.prepare(text) { // as the app does it
+    case .known(let english): result = english
+    case .translate(let input): result = (try? await session.translate(input).targetText) ?? "(failed)"
+    }
     milliseconds.append(Date().timeIntervalSince(started) * 1000)
     cache[text] = result
     return result

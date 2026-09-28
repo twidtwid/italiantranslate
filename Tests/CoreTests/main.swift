@@ -426,6 +426,24 @@ do {
            "a two-line Italian dish over two English lines: \(corniolo.map(\.title))")
 }
 
+// MARK: Dish glossary
+
+do {
+    // What Apple's translator made of these on the lab's menus: "Boiled", "Bird beans", "Florentine pepperoni".
+    expect(DishGlossary.prepare("-Ribollita") == .known("Tuscan bread, bean and cabbage soup"), "a dish known by name, list marker and all")
+    expect(DishGlossary.prepare("FAGIOLI ALL’UCCELLETTO *") == .known("Beans stewed with tomato and sage"), "capitals, curly apostrophe, footnote star")
+    expect(DishGlossary.prepare("Carciofi trifolati") == .translate("Carciofi saltati in padella con aglio e prezzemolo"),
+           "a kitchen word spelled out in plain Italian: \(DishGlossary.prepare("Carciofi trifolati"))")
+    expect(DishGlossary.rewrite("Zeppole di San Giuseppe") == "Frittelle di San Giuseppe", "capitalised at the start of the line")
+    expect(DishGlossary.rewrite("Piccione arrosto") == "Piccione arrosto", "a word that starts like one (pici) is left alone")
+    expect(DishGlossary.prepare("Guancia di maiale") == .translate("Guancia di maiale"), "everything else goes to the translator as it is")
+    // The menu's own words, which the translator reads as ordinary ones ("Seconds", "Contorns", "Covered").
+    expect(DishGlossary.prepare("SECONDI PIATTI •") == .known("Main courses") && DishGlossary.prepare("Contorni") == .known("Side dishes"),
+           "course headings")
+    expect(DishGlossary.prepare("Coperto") == .known("Cover charge"), "the cover charge")
+    expect(DishGlossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
+}
+
 // MARK: Captions
 
 do {
