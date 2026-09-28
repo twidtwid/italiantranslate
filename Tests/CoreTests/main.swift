@@ -158,6 +158,13 @@ do {
     var unsure = blurred
     unsure.confidence = 0.5
     expect(OCRTiles.merge([[sharp], [unsure]]) == [sharp], "an unsure reading doesn't")
+
+    // The whole frame read one printed line as two pieces, a band read it whole (a Tuscan menu's
+    // opening paragraph): the whole line replaces both, not just the first.
+    let head = OCRLine(text: "cucina, che celebra la tradizione toscana", box: CGRect(x: 0.167, y: 0.403, width: 0.469, height: 0.024))
+    let tail = OCRLine(text: "con uno sguardo", box: CGRect(x: 0.649, y: 0.419, width: 0.196, height: 0.015))
+    let wholeLine = OCRLine(text: "cucina, che celebra la tradizione toscana con uno sguardo", box: CGRect(x: 0.166, y: 0.403, width: 0.682, height: 0.034))
+    expect(OCRTiles.merge([[head, tail], [wholeLine]]) == [wholeLine], "both pieces give way: \(OCRTiles.merge([[head, tail], [wholeLine]]).map(\.text))")
     // The same text read twice keeps its first box; a reading that lost the price at the end doesn't win.
     var again = sharp
     again.box.size.height = 0.016
