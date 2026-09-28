@@ -22,6 +22,8 @@ struct MenuEntry: Equatable {
     var titleBox: CGRect
     var box: CGRect
     var lineCount: Int
+    /// Where the price is printed, when it's on a line of its own (a price column, under the dish).
+    var priceBox: CGRect? = nil
 
     /// Everything to translate, title first.
     var sources: [String] { isForeign ? [] : [title] + details }
@@ -214,6 +216,7 @@ enum MenuReader {
         var rows: [Row]
         var foreign: [Row] = []
         var price: String?
+        var priceBox: CGRect?
         /// Already in another language, with nothing Italian above it: a name, or an English notice.
         let isForeign: Bool
         /// The last line taken in any language: the next line must sit right under it.
@@ -356,7 +359,10 @@ enum MenuReader {
                     best = gap
                 }
             }
-            if let target, target.price == nil { target.price = price.text }
+            if let target, target.price == nil {
+                target.price = price.text
+                target.priceBox = price.box
+            }
         }
     }
 
@@ -428,7 +434,8 @@ enum MenuReader {
         let box = group.rows.map(\.box).reduce(CGRect.null) { $0.union($1) }
         return MenuEntry(kind: kind, title: title, details: details,
                          price: group.isForeign ? nil : group.price.map(Price.tidy),
-                         isForeign: group.isForeign, titleBox: titleBox, box: box, lineCount: group.rows.count)
+                         isForeign: group.isForeign, titleBox: titleBox, box: box, lineCount: group.rows.count,
+                         priceBox: group.isForeign ? nil : group.priceBox)
     }
 
     /// The name (first line, plus lines that carry it on in the same type) and the rest in runs:

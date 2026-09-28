@@ -5,13 +5,15 @@ import CoreGraphics
 
 /// One entry of a captured page (a heading, a dish, a paragraph) with its English as it arrives.
 struct Caption: Identifiable, Equatable {
-    /// Position in reading order: stable for the life of a capture.
+    /// Stable for the life of a capture: an entry keeps it when the close reading comes in.
     let id: Int
     let entry: MenuEntry
     /// English for each of the entry's sources (title, details), as the translator delivers them.
     var english: [String: String] = [:]
     /// The page's paper and ink around the title, when sampled from the still.
     var colors: InkSampler.Colors?
+    /// How far right the English may run on the picture (normalized x): see `Captions.room`.
+    var roomRight: CGFloat = 1
 
     /// The English title; nil while it's being translated. Text already in English is its own.
     var title: String? { entry.isForeign ? entry.title : english[entry.title] }
@@ -47,6 +49,19 @@ enum Captions {
         let titles = ordered.filter { !$0.isForeign }.map(\.title)
         let details = ordered.filter { !$0.isForeign }.flatMap(\.details)
         return (titles + details).filter { queued.insert($0).inserted }
+    }
+
+    /// How far right each entry's English may run on the picture (normalized x, same order as
+    /// `entries`): into the blank paper beside it, up to the next thing printed on its lines (a
+    /// price, the next column), so a longer English doesn't have to shrink to the Italian's width.
+    static func room(_ entries: [MenuEntry]) -> [CGFloat] {
+        let printed = entries.map(\.box) + entries.compactMap(\.priceBox)
+        return entries.map { entry in
+            let box = entry.box
+            let next = printed.filter { $0.minX >= box.maxX - 0.005 && $0.maxY > box.minY && $0.minY < box.maxY }
+                .map(\.minX).min()
+            return max(box.maxX, (next ?? 1) - 0.015)
+        }
     }
 
     /// Two looks in a row show the same text in about the same place: the view is steady enough to

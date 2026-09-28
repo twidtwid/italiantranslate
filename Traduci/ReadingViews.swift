@@ -156,11 +156,12 @@ struct CaptionPatches: View {
         ZStack(alignment: .topLeading) {
             if caption.paintsTitle, let title = caption.title {
                 let text = sameLine && allDetails ? title + ": " + details.joined(separator: ", ") : title
-                PrintedText(text: text, rect: titleRect, lines: max(1, titleLines), colors: caption.colors)
+                PrintedText(text: text, rect: titleRect, room: room(from: entry.titleBox),
+                            lines: max(1, titleLines), colors: caption.colors)
             }
             if allDetails, !sameLine {
                 PrintedText(text: details.joined(separator: " · "), rect: mapper.viewRect(for: detailBox),
-                            lines: max(1, entry.lineCount - titleLines), colors: caption.colors)
+                            room: room(from: detailBox), lines: max(1, entry.lineCount - titleLines), colors: caption.colors)
             }
             let target = mapper.viewRect(for: entry.box).insetBy(dx: -4, dy: -3)
             Color.clear
@@ -180,17 +181,25 @@ struct CaptionPatches: View {
         }
     }
 
+    /// How wide the English may run from `box`'s left edge, in points.
+    private func room(from box: CGRect) -> CGFloat {
+        mapper.viewRect(for: CGRect(x: box.minX, y: box.minY, width: max(caption.roomRight - box.minX, box.width), height: box.height)).width
+    }
+
     private var titleLines: Int {
         let lineHeight = caption.entry.box.height / CGFloat(max(caption.entry.lineCount, 1))
         return max(1, Int((caption.entry.titleBox.height / max(lineHeight, 0.0001)).rounded()))
     }
 }
 
-/// English printed over the Italian in the page's paper and ink, clipped to the Italian's box so it
-/// never spills over its neighbours: the picture stays a calm, readable page.
+/// English printed over the Italian in the page's paper and ink, at the Italian's type size. A
+/// longer English runs on into the blank paper beside it (`room` wide at most), never over its
+/// neighbours, and shrinks only a little before it's cut short: the list has it in full.
 struct PrintedText: View {
     let text: String
     let rect: CGRect
+    /// How wide it may run from the Italian's left edge, in points.
+    let room: CGFloat
     let lines: Int
     let colors: InkSampler.Colors?
 
@@ -203,12 +212,13 @@ struct PrintedText: View {
             .font(.system(size: max(min(lineHeight * 0.78, 40), 5), weight: .medium))
             .foregroundStyle(ink)
             .lineLimit(max(lines, 1))
-            .minimumScaleFactor(0.3)
+            .minimumScaleFactor(0.6)
             .padding(.horizontal, 1)
-            .frame(width: box.width, height: box.height, alignment: .leading)
+            .frame(minWidth: box.width, minHeight: box.height, maxHeight: box.height, alignment: .leading) // hugs the English
             .background(paper)
             .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
-            .position(x: box.midX, y: box.midY)
+            .frame(maxWidth: max(box.width, room + 2), alignment: .leading) // the room it may take
+            .offset(x: box.minX, y: box.minY)
             .allowsHitTesting(false)
     }
 }
@@ -308,7 +318,7 @@ struct ReadingPanel: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.isReadingPage {
+        if model.isReadingPage, model.captions.isEmpty {
             VStack(spacing: 10) {
                 ProgressView().tint(.white)
                 Text("Reading the page…").font(.subheadline).foregroundStyle(.secondary)
@@ -357,7 +367,7 @@ struct ReadingPanel: View {
     private var title: String { isMenu ? "Menu in English" : "In English" }
 
     private var subtitle: String {
-        if model.isReadingPage { return "Reading…" }
+        if model.isReadingPage, model.captions.isEmpty { return "Reading…" }
         let translatable = model.captions.filter { !$0.entry.isForeign }
         let done = translatable.filter(\.isTranslated).count
         if done < translatable.count { return "Translating \(done) of \(translatable.count)…" }

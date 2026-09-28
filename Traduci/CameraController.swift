@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import os
 import QuartzCore
 
 /// What the camera saw in one live frame.
@@ -10,13 +11,15 @@ struct FrameResult: @unchecked Sendable {
     let ocrMilliseconds: Double
 }
 
-/// A still, read closely: the page in bands, so the small print (prices, allergens) comes out.
+/// A still, read twice: at once from the frame's own reading, so the list shows up with the
+/// picture, then closely in bands, so the small print (prices, allergens) comes out.
 struct StillResult: @unchecked Sendable {
     let image: CGImage
     let entries: [MenuEntry]
     /// Paper and ink around each entry's title (same order as `entries`).
     let colors: [InkSampler.Colors?]
-    let ocrMilliseconds: Double
+    /// The close reading: nothing more is coming for this picture.
+    let isFinal: Bool
 }
 
 enum CameraError: LocalizedError {
@@ -41,7 +44,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     var onFrame: (@Sendable (FrameResult) -> Void)?
     /// Called on the frame queue the moment a still is taken, before it's read: freeze on it.
     var onFreeze: (@Sendable (CGImage) -> Void)?
-    /// Called on the frame queue when the still has been read.
+    /// Called on the frame queue with the still's first reading, then again with the close one.
     var onStill: (@Sendable (StillResult) -> Void)?
     /// Called on the main queue when the camera stops for the system (a call, another app, the
     /// phone too warm), with what to tell the user; with nil when it's back.
@@ -53,6 +56,17 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private let recognizer = TextRecognizer()
     private let languages = LanguageDetector() // frame queue only
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
+    private static let log = Logger(subsystem: "Traduci", category: "camera")
+
+    /// What the watchdog needs to know about the frame queue, from any queue.
+    private struct Health {
+        /// When the camera last delivered a frame, read or not.
+        var lastArrival: CFTimeInterval = 0
+        /// When the OCR read in progress started; nil when none is.
+        var busySince: CFTimeInterval?
+        var dropped = 0
+    }
+    private let health = OSAllocatedUnfairLock(initialState: Health())
 
     // Session queue only.
     private var device: AVCaptureDevice?
@@ -68,6 +82,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     /// moving car or a shaky hand, that's the sharpest of the last moments, not just the last.
     private var bestTextFrame: TextFrame?
     private var lastRead: CFTimeInterval = 0
+    /// When a frame last had text in it: with none for a while, frames are read less often.
+    private var lastTextSeen = CACurrentMediaTime()
     private var demoTimer: DispatchSourceTimer?
 
     private enum Picture {
@@ -134,15 +150,27 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             self.paused = false
             self.stillRequested = false
             self.bestTextFrame = nil
+            self.lastTextSeen = CACurrentMediaTime() // back to the camera: there's text to read next
         }
     }
 
-    /// A still is overdue: read frames again, and restart the session if it stopped. A pending
-    /// still stays pending, so the next frame that comes in is the picture.
+    /// A still is overdue. A read may be stuck, or frames may have stopped coming while the preview
+    /// runs on: cancel a read that has run for seconds, restart a camera that has gone quiet, and
+    /// let frames through again. A pending still stays pending: the next frame read is the picture.
     func recover() {
+        let now = CACurrentMediaTime()
+        if let since = health.withLock({ $0.busySince }), now - since > 1.5 {
+            Self.log.error("OCR stuck for \(now - since, format: .fixed(precision: 1)) s: cancelled")
+            recognizer.cancel()
+        }
         frameQueue.async { self.paused = false }
         sessionQueue.async {
-            if self.device != nil, !self.session.isRunning { self.session.startRunning() }
+            guard self.device != nil else { return }
+            let quiet = CACurrentMediaTime() - self.health.withLock { $0.lastArrival } > 1
+            guard quiet || !self.session.isRunning else { return }
+            Self.log.error("No frames for over a second (running: \(self.session.isRunning)): restarting the camera")
+            if self.session.isRunning { self.session.stopRunning() }
+            self.session.startRunning()
         }
     }
 
@@ -198,21 +226,47 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     // MARK: - Frames
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard !paused, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let now = CACurrentMediaTime()
-        if !stillRequested, now - lastRead < Self.restBetweenReads() { return }
+        health.withLock { $0.lastArrival = now }
+        guard !paused, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        if !stillRequested, now - lastRead < restBetweenReads(now) { return }
         lastRead = now
         process(.buffer(pixelBuffer))
     }
 
-    /// Reading every frame is the hardest work the phone does here: when it runs hot (a sunny
-    /// terrace), read less often rather than have the system stop the camera.
-    private static func restBetweenReads() -> CFTimeInterval {
-        switch ProcessInfo.processInfo.thermalState {
-        case .serious: return 0.6
-        case .critical: return 1.5
-        default: return 0
+    /// Late frames are dropped all the time, by design: OCR is slower than the camera. Any other
+    /// reason (out of buffers, a discontinuity) is worth a line in the log.
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        let reason = CMGetAttachment(sampleBuffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil) as? String
+        guard reason != (kCMSampleBufferDroppedFrameReason_FrameWasLate as String) else { return }
+        let count = health.withLock { health -> Int in
+            health.dropped += 1
+            return health.dropped
         }
+        if count == 1 || count % 30 == 0 {
+            Self.log.error("Frame dropped (\(count) so far): \(reason ?? "no reason", privacy: .public)")
+        }
+    }
+
+    /// Reading every frame is the hardest work the phone does here. Full speed while there's text
+    /// in view; less often after a while with none (the phone on the table), in Low Power Mode, and
+    /// when the phone runs hot (a sunny terrace), rather than have the system stop the camera.
+    private func restBetweenReads(_ now: CFTimeInterval) -> CFTimeInterval {
+        var rest: CFTimeInterval = now - lastTextSeen > 2 ? 0.2 : 0
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { rest = max(rest, 0.15) }
+        switch ProcessInfo.processInfo.thermalState {
+        case .serious: rest = max(rest, 0.6)
+        case .critical: rest = max(rest, 1.5)
+        default: break
+        }
+        return rest
+    }
+
+    /// Frame queue only: an OCR read, marked busy for the watchdog.
+    private func reading(_ read: () -> [OCRLine]) -> [OCRLine] {
+        health.withLock { $0.busySince = CACurrentMediaTime() }
+        defer { health.withLock { $0.busySince = nil } }
+        return read()
     }
 
     /// Frame queue only.
@@ -222,9 +276,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         switch picture {
         case .buffer(let buffer):
             // Buffers stay in the sensor's landscape layout; `.right` tells Vision the phone is upright.
-            lines = recognizer.lines(in: buffer, orientation: .right, fast: false)
+            lines = reading { recognizer.lines(in: buffer, orientation: .right) }
         case .image(let image):
-            lines = recognizer.lines(in: image, orientation: .up, fast: false)
+            lines = reading { recognizer.lines(in: image, orientation: .up) }
         }
         let ocrMilliseconds = (CACurrentMediaTime() - started) * 1000
         if stillRequested {
@@ -235,6 +289,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         let entries = MenuReader.entries(from: lines, aspect: size.height / max(size.width, 1), language: languages.language(of:))
         if !entries.isEmpty {
             let now = CACurrentMediaTime()
+            lastTextSeen = now
             let frame = TextFrame(picture: picture, lines: lines, time: now, score: Self.readability(lines))
             // A newer frame wins unless a recent one read clearly better (this one is blurred).
             let keepsBest = bestTextFrame.map { now - $0.time < Self.stillWindow && $0.score > frame.score * 1.25 } ?? false
@@ -247,7 +302,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         lines.reduce(0) { $0 + Double($1.confidence) * Double($1.text.filter(\.isLetter).count) }
     }
 
-    /// Frame queue only: freeze on `picture`, then read it in bands for the small print.
+    /// Frame queue only: freeze on `picture` and hand over what its own reading found, then read it
+    /// in bands for the small print and hand that over too.
     private func read(_ picture: Picture, lines: [OCRLine]) {
         let still: CGImage
         switch picture {
@@ -267,15 +323,18 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         bestTextFrame = nil
         onFreeze?(still)
 
-        let started = CACurrentMediaTime()
-        let closer = recognizer.lines(in: still, fast: false, bands: 2)
-        let merged = OCRTiles.merge([lines, closer])
         let aspect = CGFloat(still.height) / CGFloat(max(still.width, 1))
-        let entries = MenuReader.entries(from: merged, aspect: aspect, language: languages.language(of:))
         let sampler = InkSampler(image: still)
-        let colors = entries.map { entry in sampler.map { $0.colors(for: entry.titleBox) } }
-        onStill?(StillResult(image: still, entries: entries, colors: colors,
-                             ocrMilliseconds: (CACurrentMediaTime() - started) * 1000))
+        func result(_ lines: [OCRLine], isFinal: Bool) -> StillResult {
+            let entries = MenuReader.entries(from: lines, aspect: aspect, language: languages.language(of:))
+            let colors = entries.map { entry in sampler.map { $0.colors(for: entry.titleBox) } }
+            return StillResult(image: still, entries: entries, colors: colors, isFinal: isFinal)
+        }
+        // Most of it is translated already, from aiming: the list can show up with the picture.
+        let first = result(lines, isFinal: false)
+        if !first.entries.isEmpty { onStill?(first) }
+        let closer = reading { recognizer.lines(in: still, bands: 2) }
+        onStill?(result(OCRTiles.merge([lines, closer]), isFinal: true))
     }
 
     private func uprightSize(_ picture: Picture) -> CGSize {

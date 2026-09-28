@@ -386,6 +386,23 @@ do {
            "a price on its own line inside a dish: \(String(describing: risotto))")
     expect(!conteCapture.contains { $0.title == "latte, frutta a guscio" }, "the allergens aren't an entry of their own")
 
+    // On the picture, a dish's English may run on into the blank paper beside it: up to its price in
+    // the price column, and in the left column up to the right one.
+    let nerocarboneRoom = Captions.room(nerocarbone)
+    if let index = nerocarbone.firstIndex(where: { $0.title == "Pere e pecorino" }), let price = nerocarbone[index].priceBox {
+        let room = nerocarboneRoom[index]
+        expect(room > nerocarbone[index].box.maxX + 0.2 && room < price.minX, "up to the price column: \(room), price at \(price.minX)")
+    } else {
+        expect(false, "Pere e pecorino, with its price in the price column")
+    }
+    if let index = conte.firstIndex(where: { $0.title == "Capasanta arrostita" }) {
+        let room = Captions.room(conte)[index]
+        let box = conte[index].box
+        let rightColumn = conte.filter { $0.box.minX > 0.5 && $0.box.maxY > box.minY && $0.box.minY < box.maxY }
+            .map(\.box.minX).min() ?? 1
+        expect(room > box.maxX + 0.05 && room < rightColumn, "up to the right column at \(rightColumn): \(room)")
+    }
+
     let piccadilly = fixture("piccadilly-p1-top") // Italian with English under each dish, prices on the right
     expect(piccadilly.filter { $0.kind == .item }.count >= 18, "dishes priced: \(piccadilly.filter { $0.kind == .item }.count)")
     expect(entry(piccadilly, "Melanzane alla parmigiana")?.price == "€14.00", "Melanzane alla parmigiana €14.00")
