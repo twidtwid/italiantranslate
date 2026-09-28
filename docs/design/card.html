@@ -1,0 +1,179 @@
+<!doctype html>
+<!--
+  Source for the README banner and the social cards in docs/images.
+  Regenerate with: node docs/design/render.mjs   (needs Playwright)
+  Layouts: ?layout=wide (1280×640), ?layout=square (1080×1080); add &rounded for transparent corners.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Traduci card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap">
+<style>
+  :root {
+    --bg-1: #0c0f13;
+    --bg-2: #151a21;
+    --text: #f2f4f6;
+    --muted: #9aa4af;
+    --faint: #66707b;
+    --amber: #ffc254;
+    --flag-green: #009246;
+    --flag-white: #f4f5f0;
+    --flag-red: #ce2b37;
+    --ink: #2a2017;
+    --paper: #f3ead8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body { font-family: Inter, system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(640px 520px at 78% 58%, rgba(255, 180, 70, 0.16), transparent 70%),
+      radial-gradient(520px 420px at 8% 0%, rgba(206, 43, 55, 0.10), transparent 70%),
+      linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  }
+  .rounded .card { border-radius: 28px; }
+  .wide .card { width: 1280px; height: 640px; }
+  .square .card { width: 1080px; height: 1080px; }
+
+  /* ---------- Copy ---------- */
+  .copy { position: absolute; }
+  .wide .copy { left: 76px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; }
+  .square .copy { left: 0; right: 0; top: 92px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .icon { width: 92px; height: 92px; border-radius: 21px; box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08); }
+  .name { font-size: 84px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  .flag { display: flex; width: 72px; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 12px; }
+  .flag i { flex: 1; }
+  .flag i:nth-child(1) { background: var(--flag-green); }
+  .flag i:nth-child(2) { background: var(--flag-white); }
+  .flag i:nth-child(3) { background: var(--flag-red); }
+
+  .headline { font-size: 44px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; margin-top: 38px; }
+  .headline em { font-style: normal; color: var(--amber); }
+  .sub { font-size: 21px; line-height: 1.45; color: var(--muted); margin-top: 18px; max-width: 560px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .square .chips { justify-content: center; }
+  .chip { font-size: 16px; font-weight: 600; color: #d6dbe0; padding: 8px 14px; border-radius: 999px;
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.13); }
+  .url { position: absolute; font-size: 16px; font-weight: 500; color: var(--faint); letter-spacing: 0.01em; }
+  .wide .url { left: 76px; bottom: 40px; }
+  .square .url { left: 0; right: 0; bottom: 40px; text-align: center; }
+  .square .headline { font-size: 50px; margin-top: 34px; }
+  .square .sub { font-size: 22px; max-width: 760px; }
+
+  /* ---------- Phone ---------- */
+  .phone {
+    position: absolute; width: 284px; height: 596px; border-radius: 54px; padding: 10px;
+    background: linear-gradient(145deg, #3a3f46, #16181c 40%, #0a0b0d);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.10), inset 0 0 0 2px rgba(0,0,0,0.6);
+  }
+  .wide .phone { right: 132px; top: 22px; transform: rotate(3deg); }
+  .square .phone { left: 50%; top: 522px; transform: translateX(-50%) scale(1.12); transform-origin: top center; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 44px; overflow: hidden;
+            background:
+              repeating-linear-gradient(92deg, rgba(0,0,0,0.00) 0 7px, rgba(0,0,0,0.07) 7px 9px, rgba(255,255,255,0.02) 9px 15px),
+              radial-gradient(420px 360px at 50% 40%, #6a4a31, #3a2718 70%, #24180f); }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; border-radius: 14px; background: #000; z-index: 3; }
+
+
+  /* The captured page: a menu on a wooden table, the English printed in its own paper and ink. */
+  .photo { position: absolute; left: 0; right: 0; top: 0; height: 262px; overflow: hidden; }
+  .menu { position: absolute; left: 22px; right: 22px; top: 44px; padding: 16px 16px 30px; border-radius: 4px;
+          background: radial-gradient(circle at 40% 30%, #fbf5e8, var(--paper) 60%, #e7dcc4);
+          box-shadow: 0 18px 30px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.3);
+          transform: rotate(-1.2deg); color: var(--ink); }
+  .menu h1 { font: italic 700 17px "Cormorant Garamond", Georgia, serif; text-align: center; }
+  .menu h2 { font: 700 8.5px Inter, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; margin: 10px 0 3px; color: #7a2e22; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; font: 600 10.5px Inter, sans-serif; line-height: 1.55; }
+  .row b { font: 700 12.5px "Cormorant Garamond", serif; }
+  .picked { outline: 1.8px solid var(--amber); outline-offset: 2px; border-radius: 3px; }
+
+  /* The English, at a size you can read at the table. */
+  .panel { position: absolute; left: 0; right: 0; top: 240px; bottom: 0; background: #1b1b1c;
+           border-radius: 20px 20px 0 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.4); padding: 7px 0 0; z-index: 2; }
+  .grabber { width: 30px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.28); margin: 0 auto 8px; }
+  .head { display: flex; align-items: center; gap: 8px; padding: 0 14px 9px; border-bottom: 0.5px solid rgba(255,255,255,0.12); }
+  .head .title { font-size: 12.5px; font-weight: 700; }
+  .head .count { font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .head .grow { flex: 1; }
+  .share { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.1); display: grid; place-items: center; }
+  .scan { font-size: 11px; font-weight: 700; color: #111; background: var(--amber); padding: 6px 12px; border-radius: 999px; }
+  .list { padding: 2px 0 0; }
+  .section { padding: 10px 14px 3px; }
+  .section b { display: block; font-size: 8px; font-weight: 800; letter-spacing: 0.14em; color: var(--amber); }
+  .section i { display: block; font-size: 8px; font-style: normal; color: rgba(255,255,255,0.42); margin-top: 1px; }
+  .dish { display: flex; justify-content: space-between; gap: 8px; padding: 6px 14px; }
+  .dish.on { background: rgba(255,194,84,0.13); box-shadow: inset 2.5px 0 0 var(--amber); }
+  .dish strong { display: block; font-size: 11px; font-weight: 650; color: #fff; }
+  .dish small { display: block; font-size: 8.8px; color: rgba(255,255,255,0.62); margin-top: 1px; }
+  .dish em { display: block; font-size: 8.4px; color: rgba(255,255,255,0.42); margin-top: 1px; }
+  .dish .price { font-size: 11px; font-weight: 600; color: var(--amber); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="copy">
+    <div class="brand">
+      <img class="icon" src="../../Traduci/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="">
+      <div>
+        <div class="name">Traduci</div>
+        <div class="flag"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="headline">Point at an Italian menu.<br><em>Read it in English.</em></div>
+    <div class="sub">One picture, and the menu stays put: every dish in English with its price and the Italian name to order by. All on the iPhone, offline.</div>
+    <div class="chips">
+      <span class="chip">Works offline</span>
+      <span class="chip">Reads menus</span>
+      <span class="chip">Vision OCR</span>
+      <span class="chip">Apple Translation</span>
+    </div>
+  </div>
+  <div class="url">github.com/twidtwid/italiantranslate</div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="photo">
+        <div class="menu">
+          <h1>Today's menu</h1>
+          <h2>First courses</h2>
+          <div class="row"><span>Spaghetti carbonara</span><b>12</b></div>
+          <div class="row"><span class="picked">Porcini mushroom risotto</span><b>14</b></div>
+          <h2>Main courses</h2>
+          <div class="row"><span>Roman-style saltimbocca</span><b>16</b></div>
+          <div class="row"><span>Baked sea bass</span><b>18</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="grabber"></div>
+        <div class="head">
+          <div><div class="title">Menu in English</div><div class="count">7 dishes</div></div>
+          <div class="grow"></div>
+          <div class="share"><svg width="11" height="13" viewBox="0 0 11 13" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8V1M3 3.3 5.5 1 8 3.3M3.2 5.5H2v6.5h7V5.5H7.8"/></svg></div>
+          <div class="scan">Scan</div>
+        </div>
+        <div class="list">
+          <div class="section"><b>FIRST COURSES</b><i>Primi</i></div>
+          <div class="dish"><div><strong>Spaghetti carbonara</strong><small>guanciale, egg, pecorino</small><em>Spaghetti alla carbonara</em></div><span class="price">€12</span></div>
+          <div class="dish on"><div><strong>Porcini mushroom risotto</strong><em>Risotto ai funghi porcini</em></div><span class="price">€14</span></div>
+          <div class="section"><b>MAIN COURSES</b><i>Secondi</i></div>
+          <div class="dish"><div><strong>Roman-style saltimbocca</strong><em>Saltimbocca alla romana</em></div><span class="price">€16</span></div>
+          <div class="dish"><div><strong>Baked sea bass</strong><em>Branzino al forno</em></div><span class="price">€18</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  document.body.classList.add(params.get("layout") || "wide");
+  if (params.has("rounded")) document.body.classList.add("rounded");
+</script>
+</body>
+</html>

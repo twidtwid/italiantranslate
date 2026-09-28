@@ -1,0 +1,72 @@
+name: iOS build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths-ignore: ["**.md"]
+  pull_request:
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Xcode ${{ matrix.xcode }}
+    if: ${{ !contains(github.event.head_commit.message, '[lab]') }} # the lab workflow covers those
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            xcode: "26"
+            experimental: false
+          - runner: xcode-27 # public-preview image with the iOS 27 SDK
+            xcode: "27"
+            experimental: true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: xcodebuild -version
+
+      - name: Core logic tests
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/CoreTests/main.swift -o "$RUNNER_TEMP/core-tests"
+          "$RUNNER_TEMP/core-tests"
+
+      - name: Build app (unsigned Release)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Traduci.xcodeproj \
+            -scheme Traduci \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Check the built app
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/Traduci.app"
+          ls -la "$APP"
+          # The app's own Swift types must be in the binary, not just an empty shell.
+          for type in AppModel ContentView TranslationEngine CameraController MotionMonitor LanguageDetector; do
+            strings "$APP/Traduci" | grep -q "$type" || { echo "::error::$type missing from binary"; exit 1; }
+          done
+          test -f "$APP/Assets.car"
+          plutil -extract NSCameraUsageDescription raw "$APP/Info.plist"
+          plutil -extract CFBundleDisplayName raw "$APP/Info.plist"
+          plutil -extract MinimumOSVersion raw "$APP/Info.plist"
+          test "$(plutil -extract ITSAppUsesNonExemptEncryption raw "$APP/Info.plist")" = "false"

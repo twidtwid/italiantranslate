@@ -1,0 +1,102 @@
+name: Menu lab
+
+# Real Italian menus through the app's own OCR and grouping on a Mac. Results go to the "lab"
+# draft release (visible to collaborators only).
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["Tests/**", "Traduci/**", ".github/workflows/lab.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # the draft release that holds the results
+
+concurrency:
+  group: lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lab:
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      LAB: ${{ github.workspace }}/lab-results
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Camera frames from the menus
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet -r Tests/Lab/requirements.txt
+          "$RUNNER_TEMP/venv/bin/python" Tests/Lab/fixtures.py Tests/Lab/menus.json "$LAB/frames"
+
+      - name: Core logic tests
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Tests/CoreTests/main.swift -o "$RUNNER_TEMP/core-tests"
+          "$RUNNER_TEMP/core-tests"
+
+      - name: App OCR and menu reading
+        if: ${{ !cancelled() }}
+        run: |
+          xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$RUNNER_TEMP/lab"
+          "$RUNNER_TEMP/lab" "$LAB/frames" "$LAB/app"
+
+      - name: The app in the Simulator
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # Newest iPhone Pro (not Max): the same screen as the phones it's used on.
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          best = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if "iOS" not in runtime:
+                  continue
+              version = tuple(int(p) for p in runtime.rsplit("iOS-", 1)[-1].split("-") if p.isdigit())
+              for device in devices:
+                  name = device["name"]
+                  if name.startswith("iPhone") and "Pro" in name and "Max" not in name:
+                      if best is None or (version, name) > best[0]:
+                          best = ((version, name), device["udid"])
+          print(best[1])')
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b > /dev/null
+          xcodebuild build -project Traduci.xcodeproj -scheme Traduci -configuration Debug \
+            -destination "id=$UDID" -derivedDataPath "$RUNNER_TEMP/sim" -quiet CODE_SIGNING_ALLOWED=NO
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/Traduci.app"
+          DATA=$(xcrun simctl get_app_container "$UDID" com.twidtwid.Traduci data)
+          mkdir -p "$DATA/Documents" "$LAB/screens"
+          cp "$LAB/frames/"*.jpg Tests/Lab/english.json "$DATA/Documents/"
+          shoot() { # name, frame, seconds to wait, launch arguments
+            local name=$1 frame=$2 wait=$3
+            shift 3
+            xcrun simctl launch --terminate-running-process "$UDID" com.twidtwid.Traduci \
+              -demo "$frame" -demoTranslations english.json "$@" > /dev/null
+            sleep "$wait"
+            xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/shot.png" > /dev/null 2>&1
+            sips -s format jpeg -s formatOptions 85 -Z 1300 "$RUNNER_TEMP/shot.png" --out "$LAB/screens/$name.jpg" > /dev/null
+          }
+          shoot 0-warmup nerocarbone-p1-page.jpg 10 -demoStage live
+          shoot 1-aiming nerocarbone-p1-page.jpg 6 -demoStage live
+          shoot 2-menu-half nerocarbone-p1-page.jpg 24
+          shoot 3-menu-full nerocarbone-p1-page.jpg 24 -demoPanel full
+          shoot 4-closer-focus nerocarbone-p1-middle.jpg 24 -demoFocus 9
+          shoot 5-centred sanpastore-p1-page.jpg 24
+          shoot 6-two-columns casadelconte-p1-middle.jpg 32
+          shoot 7-bilingual-peek piccadilly-p1-top.jpg 28 -demoPanel peek
+          shoot 8-bilingual-full piccadilly-p1-page.jpg 28 -demoPanel full
+          ls -la "$LAB/screens"
+
+      - name: Publish results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "${{ github.sha }}" > "$LAB/commit.txt"
+          (cd "$LAB" && zip -qr "$RUNNER_TEMP/lab-results.zip" .)
+          gh release view lab >/dev/null 2>&1 || gh release create lab --draft --title "Menu lab" --notes "Scratch results from the menu lab workflow. Not a release."
+          gh release upload lab "$RUNNER_TEMP/lab-results.zip" --clobber
+          ls -la "$RUNNER_TEMP/lab-results.zip"

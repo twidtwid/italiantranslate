@@ -1,0 +1,4 @@
+# For asc_preflight.py and asc_feedback.py (App Store Connect API) in CI.
+PyJWT==2.15.0
+cryptography==50.0.1
+pillow==12.3.0
