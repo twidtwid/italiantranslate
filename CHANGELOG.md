@@ -2,7 +2,7 @@
 
 Builds ship through TestFlight; the build number is the number of the workflow run that uploaded it.
 
-## Build NEXT — 28 September 2026
+## Build 20.1 — 28 September 2026
 
 **Five TestFlight reports from a day in Chianti.**
 
@@ -14,7 +14,8 @@ Builds ship through TestFlight; the build number is the number of the workflow r
 - **Blurred in a moving car:** the picture is the sharpest of the last few frames, not just the
   last, and exposures stay short while the phone keeps shaking.
 - **The same line twice:** a line cut by the edge of one of the two reading bands came out garbled
-  and stayed as a second entry. Those half-read lines are dropped now.
+  and stayed as a second entry. Those half-read lines are dropped now, and of two readings of a
+  line the closer look wins ("glutine, pesce", not "alutine. cesce").
 - **Plaques and notices:** running text is read as whole paragraphs in one style and translated
   whole, without the Italian repeated under each, and a number at the end of a line ("lunga 101")
   is no longer taken for a price.
