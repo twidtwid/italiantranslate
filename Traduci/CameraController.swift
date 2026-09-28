@@ -33,7 +33,7 @@ enum CameraError: LocalizedError {
 
 /// Owns the capture session and reads the newest frame whenever the previous read is done. Frames
 /// that arrive while OCR is busy are dropped, never queued, so what it reports is always fresh.
-/// Taking a still freezes the newest frame that had text, reads it closely, and pauses until
+/// Taking a still freezes the recent frame that read best, reads it closely, and pauses until
 /// `resume()`: nothing moves while the user reads.
 final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let session = AVCaptureSession()
@@ -43,6 +43,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     var onFreeze: (@Sendable (CGImage) -> Void)?
     /// Called on the frame queue when the still has been read.
     var onStill: (@Sendable (StillResult) -> Void)?
+    /// Called on the main queue when the camera stops for the system (a call, another app, the
+    /// phone too warm), with what to tell the user; with nil when it's back.
+    var onInterruption: (@Sendable (String?) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "Traduci.session")
     private let frameQueue = DispatchQueue(label: "Traduci.frames", qos: .userInteractive)
@@ -56,11 +59,15 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var mainLensZoom: CGFloat = 1
     private var zoomStops: [CGFloat] = [1, 2]
 
+    private var observers: [NSObjectProtocol] = [] // set once, when the session is configured
+
     // Frame queue only.
     private var paused = false
     private var stillRequested = false
-    /// The newest frame that had text: a still freezes that one at once instead of waiting.
-    private var lastTextFrame: TextFrame?
+    /// The recent frame that read best: a still freezes that one at once instead of waiting. In a
+    /// moving car or a shaky hand, that's the sharpest of the last moments, not just the last.
+    private var bestTextFrame: TextFrame?
+    private var lastRead: CFTimeInterval = 0
     private var demoTimer: DispatchSourceTimer?
 
     private enum Picture {
@@ -72,7 +79,12 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         let picture: Picture
         let lines: [OCRLine]
         let time: CFTimeInterval
+        /// How much it read, and how surely: blur costs letters and confidence.
+        let score: Double
     }
+
+    /// How long a frame stays fresh enough to freeze.
+    private static let stillWindow: CFTimeInterval = 0.8
 
     /// Starts the camera and returns its zoom stops relative to the main lens, e.g. [1, 2, 5].
     func start() async throws -> [CGFloat] {
@@ -103,13 +115,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
     }
 
-    /// Freezes the newest frame that had text (or, with none lately, the next frame), reads it
+    /// Freezes the recent frame that read best (or, with none lately, the next frame), reads it
     /// closely, then stays paused until `resume()`.
     func takeStill() {
         frameQueue.async {
-            if let frame = self.lastTextFrame, CACurrentMediaTime() - frame.time < 0.8 {
+            if let frame = self.bestTextFrame, CACurrentMediaTime() - frame.time < Self.stillWindow {
                 self.read(frame.picture, lines: frame.lines)
             } else {
+                self.paused = false // the next frame is the still: it has to be read
                 self.stillRequested = true
             }
         }
@@ -120,7 +133,36 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         frameQueue.async {
             self.paused = false
             self.stillRequested = false
-            self.lastTextFrame = nil
+            self.bestTextFrame = nil
+        }
+    }
+
+    /// A still is overdue: read frames again, and restart the session if it stopped. A pending
+    /// still stays pending, so the next frame that comes in is the picture.
+    func recover() {
+        frameQueue.async { self.paused = false }
+        sessionQueue.async {
+            if self.device != nil, !self.session.isRunning { self.session.startRunning() }
+        }
+    }
+
+    /// Short exposures while the phone shakes (a moving car, a walk): grainier frames, but sharp
+    /// enough to read. Off, the camera goes back to its own judgement, low-light boost included.
+    func setShortExposure(_ on: Bool) {
+        sessionQueue.async {
+            guard let device = self.device, (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            if on {
+                let format = device.activeFormat
+                let limit = CMTimeMinimum(CMTimeMaximum(CMTime(value: 1, timescale: 125), format.minExposureDuration),
+                                          format.maxExposureDuration)
+                device.activeMaxExposureDuration = limit
+            } else {
+                device.activeMaxExposureDuration = .invalid // the format's default
+            }
+            if device.isLowLightBoostSupported {
+                device.automaticallyEnablesLowLightBoostWhenAvailable = !on // the boost lengthens exposures
+            }
         }
     }
 
@@ -157,7 +199,20 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard !paused, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let now = CACurrentMediaTime()
+        if !stillRequested, now - lastRead < Self.restBetweenReads() { return }
+        lastRead = now
         process(.buffer(pixelBuffer))
+    }
+
+    /// Reading every frame is the hardest work the phone does here: when it runs hot (a sunny
+    /// terrace), read less often rather than have the system stop the camera.
+    private static func restBetweenReads() -> CFTimeInterval {
+        switch ProcessInfo.processInfo.thermalState {
+        case .serious: return 0.6
+        case .critical: return 1.5
+        default: return 0
+        }
     }
 
     /// Frame queue only.
@@ -179,16 +234,21 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         let size = uprightSize(picture)
         let entries = MenuReader.entries(from: lines, aspect: size.height / max(size.width, 1), language: languages.language(of:))
         if !entries.isEmpty {
-            lastTextFrame = TextFrame(picture: picture, lines: lines, time: CACurrentMediaTime())
+            let now = CACurrentMediaTime()
+            let frame = TextFrame(picture: picture, lines: lines, time: now, score: Self.readability(lines))
+            // A newer frame wins unless a recent one read clearly better (this one is blurred).
+            let keepsBest = bestTextFrame.map { now - $0.time < Self.stillWindow && $0.score > frame.score * 1.25 } ?? false
+            if !keepsBest { bestTextFrame = frame }
         }
         onFrame?(FrameResult(entries: entries, imageSize: size, ocrMilliseconds: ocrMilliseconds))
     }
 
+    private static func readability(_ lines: [OCRLine]) -> Double {
+        lines.reduce(0) { $0 + Double($1.confidence) * Double($1.text.filter(\.isLetter).count) }
+    }
+
     /// Frame queue only: freeze on `picture`, then read it in bands for the small print.
     private func read(_ picture: Picture, lines: [OCRLine]) {
-        paused = true
-        stillRequested = false
-        lastTextFrame = nil
         let still: CGImage
         switch picture {
         case .image(let image):
@@ -197,10 +257,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             let upright = CIImage(cvPixelBuffer: buffer).oriented(.right)
             guard let image = ciContext.createCGImage(upright, from: upright.extent) else {
                 paused = false
+                stillRequested = true // no picture from this one: the next frame is the still
                 return
             }
             still = image
         }
+        paused = true
+        stillRequested = false
+        bestTextFrame = nil
         onFreeze?(still)
 
         let started = CACurrentMediaTime()
@@ -254,6 +318,38 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             device.unlockForConfiguration()
         }
         self.device = device
+        observeInterruptions()
+    }
+
+    /// The system can take the camera away (a call, another app, a phone too warm): say so, and
+    /// restart after a failure, rather than sit on a frozen picture.
+    private func observeInterruptions() {
+        let center = NotificationCenter.default
+        observers = [
+            center.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: .main) { [weak self] note in
+                let value = note.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+                guard let message = CameraController.message(for: value.flatMap(AVCaptureSession.InterruptionReason.init(rawValue:))) else { return }
+                self?.onInterruption?(message)
+            },
+            center.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: .main) { [weak self] _ in
+                self?.onInterruption?(nil)
+            },
+            center.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil) { [weak self] _ in
+                guard let self else { return }
+                self.sessionQueue.async {
+                    if !self.session.isRunning { self.session.startRunning() }
+                }
+            },
+        ]
+    }
+
+    private static func message(for reason: AVCaptureSession.InterruptionReason?) -> String? {
+        switch reason {
+        case .videoDeviceNotAvailableInBackground?: return nil // nobody's looking
+        case .videoDeviceNotAvailableDueToSystemPressure?: return "iPhone is too warm: the camera is resting"
+        case .videoDeviceInUseByAnotherClient?: return "Another app is using the camera"
+        default: return "Camera paused"
+        }
     }
 
     private func tune(_ device: AVCaptureDevice) {

@@ -63,7 +63,7 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 
 **Point, hold, read.**
 - **Point** at the menu. While you hold still over text, the ring around the shutter fills, then the picture is taken. Tap the shutter to take it straight away.
-- **Read.** The photo stays on screen with the English painted over the Italian. Below it is the menu in English: the sections, each dish with what's in it, its price, and the Italian name to order by.
+- **Read.** The photo stays on screen with the English painted over the Italian. Below it is the menu in English: the sections, each dish with what's in it, its price, and the Italian name to order by. A sign or a plaque comes out as plain paragraphs, each translated whole.
 - **Scan** goes back to the camera for the next page.
 
 | | |
@@ -78,17 +78,21 @@ The shared scheme runs the **Release** build, so the phone gets the optimised bi
 | Top-left pill | Status, plus the latest OCR and translation (MT) times in ms |
 
 - The phone switches to the ultra-wide lens by itself for close-up (macro) text.
+- In a moving car or on a walk, the camera shortens its exposures while the phone shakes, and the picture is the sharpest of the last few frames, not just the last.
+- If the camera stops (a call, another app, the phone too warm in the sun), the app says so instead of waiting.
 - Hold it upright: the app is portrait-only, so text shot with the phone sideways isn't read.
 
 ## How it works
 
 ```
 aiming:   camera ─► Vision OCR, newest frame only ─► menu reader ─► translate ahead, centre first (cached)
-capture:  hold still or tap ─► freeze the frame ─► OCR it again in two overlapping bands (Vision reads at a
-          fixed working size, so a band is a closer look: small prices come out) ─► menu reader ─► the list,
-          and English painted over the photo in the page's own paper and ink colours
+capture:  hold still or tap ─► freeze the recent frame that read best ─► OCR it again in two overlapping
+          bands (Vision reads at a fixed working size, so a band is a closer look: small prices come out;
+          lines a band's edge cuts through are left to the other band) ─► menu reader ─► the list, and
+          English painted over the photo in the page's own paper and ink colours
 menu reader: level the page ─► glue split lines ─► prices ─► dish / description / allergens / heading ─►
-             columns in reading order ─► the menu's own English set aside
+             columns in reading order ─► the menu's own English set aside; running text (a plaque, a
+             notice) is read again as whole paragraphs
 ```
 
 | File | Role |

@@ -97,6 +97,26 @@ enum TextNormalizer {
         return Double(2 * shared) / Double(x.count + y.count - 2)
     }
 
+    /// How much of `part` is in `whole`, 0...1: the share of its letter pairs found there (case,
+    /// accents, spaces and punctuation ignored). A misread piece of a line is mostly in the line.
+    static func containment(_ part: String, in whole: String) -> Double {
+        let x = Array(folded(part)), y = Array(folded(whole))
+        guard x.count > 1, y.count > 1 else { return 0 }
+        var pairs: [String: Int] = [:]
+        for index in 0..<(y.count - 1) {
+            pairs[String([y[index], y[index + 1]]), default: 0] += 1
+        }
+        var shared = 0
+        for index in 0..<(x.count - 1) {
+            let pair = String([x[index], x[index + 1]])
+            if let count = pairs[pair], count > 0 {
+                pairs[pair] = count - 1
+                shared += 1
+            }
+        }
+        return Double(shared) / Double(x.count - 1)
+    }
+
     static func readsAsContinuation(_ line: String, _ next: String) -> Bool {
         guard let lastCharacter = line.last,
               let firstLetter = next.first(where: { $0.isLetter }) else { return false }

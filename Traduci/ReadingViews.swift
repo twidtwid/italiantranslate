@@ -94,6 +94,7 @@ struct PhotoView: View {
                 CaptionPatches(caption: caption, mapper: mapper, focused: caption.id == model.focusedID) {
                     model.focus(caption.id, fromList: false)
                 }
+                .zIndex(caption.id == model.focusedID ? 1 : 0) // the picked one over its neighbours
             }
             if model.isReadingPage {
                 ReadingSweep()
@@ -362,7 +363,7 @@ struct ReadingPanel: View {
         if done < translatable.count { return "Translating \(done) of \(translatable.count)…" }
         let dishes = model.captions.filter { $0.entry.kind == .item }.count
         if dishes > 0 { return dishes == 1 ? "1 dish" : "\(dishes) dishes" }
-        return translatable.count == 1 ? "1 line" : "\(translatable.count) lines"
+        return translatable.isEmpty ? "Already in English" : "Translated on this iPhone"
     }
 }
 
