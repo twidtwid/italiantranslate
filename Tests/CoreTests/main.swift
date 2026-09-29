@@ -447,6 +447,10 @@ do {
     expect(DishGlossary.prepare("Secondi di pesce") == .translate("Secondi di pesce"), "but not a different heading")
     expect(DishGlossary.prepare("Con un primo piatto") == .translate("Con un primo piatto"), "or a line that says more than the heading")
     expect(DishGlossary.rewrite("Fettuccine speck e finferli") == "Fettuccine speck e chanterelle", "an English name passes through the translator")
+    // Roman and Tuscan words the translator made into "Toad", "Silly bread" and "Linguine with rock".
+    expect(DishGlossary.rewrite("Coda di rospo al forno") == "Rana pescatrice al forno", "monkfish")
+    expect(DishGlossary.rewrite("Linguine allo scoglio") == "Linguine ai frutti di mare", "seafood")
+    expect(DishGlossary.rewrite("Cacciucco alla livornese") == "Zuppa di pesce alla livornese", "a phrase before the word it contains")
     expect(DishGlossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
 }
 
