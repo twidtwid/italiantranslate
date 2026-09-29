@@ -158,6 +158,13 @@ do {
     var unsure = blurred
     unsure.confidence = 0.5
     expect(OCRTiles.merge([[sharp], [unsure]]) == [sharp], "an unsure reading doesn't")
+
+    // The whole frame read one printed line as two pieces, a band read it whole (a Tuscan menu's
+    // opening paragraph): the whole line replaces both, not just the first.
+    let head = OCRLine(text: "cucina, che celebra la tradizione toscana", box: CGRect(x: 0.167, y: 0.403, width: 0.469, height: 0.024))
+    let tail = OCRLine(text: "con uno sguardo", box: CGRect(x: 0.649, y: 0.419, width: 0.196, height: 0.015))
+    let wholeLine = OCRLine(text: "cucina, che celebra la tradizione toscana con uno sguardo", box: CGRect(x: 0.166, y: 0.403, width: 0.682, height: 0.034))
+    expect(OCRTiles.merge([[head, tail], [wholeLine]]) == [wholeLine], "both pieces give way: \(OCRTiles.merge([[head, tail], [wholeLine]]).map(\.text))")
     // The same text read twice keeps its first box; a reading that lost the price at the end doesn't win.
     var again = sharp
     again.box.size.height = 0.016
@@ -380,6 +387,12 @@ do {
 
     // As a capture reads it, the bands find the price the menu prints on a line of its own between
     // the ingredients and the allergens: the allergens stay with the dish.
+    // Centred dishes with their allergen numbers on a line of their own, then the price: "1, 7" is
+    // not €1.70, and the lone "7" is not €7.
+    let santIlario = fixture("santilario-p2-page")
+    let prices = santIlario.filter { $0.kind == .item }.map { $0.price ?? "none" }
+    expect(prices == ["€19.00", "€16.00", "€16.00", "€18.00", "€16.00"], "the prices, not the allergen numbers: \(prices)")
+
     let conteCapture = fixture("casadelconte-p1-middle-capture")
     let risotto = entry(conteCapture, "Risotto al Blu del Birraio")
     expect(risotto?.price == "€10" && risotto?.details == ["asparagi, ricotta di mandorle al miele", "latte, frutta a guscio"],
@@ -411,6 +424,30 @@ do {
     let corniolo = fixture("corniolo-p1-page")
     expect(entry(corniolo, "Maccheroncini al torchio al ragout bianco di vitello, maggiorana e olive taggiasche")?.price == "€12.00",
            "a two-line Italian dish over two English lines: \(corniolo.map(\.title))")
+}
+
+// MARK: Dish glossary
+
+do {
+    // What Apple's translator made of these on the lab's menus: "Boiled", "Bird beans", "Florentine pepperoni".
+    expect(DishGlossary.prepare("-Ribollita") == .known("Tuscan bread, bean and cabbage soup"), "a dish known by name, list marker and all")
+    expect(DishGlossary.prepare("FAGIOLI ALL’UCCELLETTO *") == .known("Beans stewed with tomato and sage"), "capitals, curly apostrophe, footnote star")
+    expect(DishGlossary.prepare("Carciofi trifolati") == .translate("Carciofi saltati in padella con aglio e prezzemolo"),
+           "a kitchen word spelled out in plain Italian: \(DishGlossary.prepare("Carciofi trifolati"))")
+    expect(DishGlossary.rewrite("Zeppole di San Giuseppe") == "Frittelle di San Giuseppe", "capitalised at the start of the line")
+    expect(DishGlossary.rewrite("Piccione arrosto") == "Piccione arrosto", "a word that starts like one (pici) is left alone")
+    expect(DishGlossary.prepare("Guancia di maiale") == .translate("Guancia di maiale"), "everything else goes to the translator as it is")
+    // The menu's own words, which the translator reads as ordinary ones ("Seconds", "Contorns", "Covered").
+    expect(DishGlossary.prepare("SECONDI PIATTI •") == .known("Main courses") && DishGlossary.prepare("Contorni") == .known("Side dishes"),
+           "course headings")
+    expect(DishGlossary.prepare("Coperto") == .known("Cover charge"), "the cover charge")
+    expect(DishGlossary.rewrite("Gelato coperto di cioccolato") == "Gelato coperto di cioccolato", "coperto inside a line is just \"covered\"")
+    expect(DishGlossary.prepare("Secondi Pialli") == .known("Main courses") && DishGlossary.prepare("Primi Pialli") == .known("First courses"),
+           "a heading OCR misread")
+    expect(DishGlossary.prepare("Secondi di pesce") == .translate("Secondi di pesce"), "but not a different heading")
+    expect(DishGlossary.prepare("Con un primo piatto") == .translate("Con un primo piatto"), "or a line that says more than the heading")
+    expect(DishGlossary.rewrite("Fettuccine speck e finferli") == "Fettuccine speck e chanterelle", "an English name passes through the translator")
+    expect(DishGlossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
 }
 
 // MARK: Captions

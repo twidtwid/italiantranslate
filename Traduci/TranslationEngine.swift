@@ -132,9 +132,19 @@ final class TranslationEngine {
             store(translation, for: source)
         }
 
-        if batch.count > 1 {
-            let requests = batch.map {
-                TranslationSession.Request(sourceText: TextNormalizer.translationInput($0), clientIdentifier: $0)
+        // Dishes known by name need no translator; the rest go with their kitchen words spelled out.
+        var inputs: [(source: String, text: String)] = []
+        for source in batch {
+            switch DishGlossary.prepare(source) {
+            case .known(let english): deliver(source, english)
+            case .translate(let text): inputs.append((source, text))
+            }
+        }
+        guard !inputs.isEmpty else { return }
+
+        if inputs.count > 1 {
+            let requests = inputs.map {
+                TranslationSession.Request(sourceText: $0.text, clientIdentifier: $0.source)
             }
             do {
                 for try await response in session.translate(batch: requests) {
@@ -150,9 +160,9 @@ final class TranslationEngine {
         }
 
         // One at a time, so a single bad string can't sink the rest.
-        for source in batch where cache[source] == nil {
+        for (source, text) in inputs where cache[source] == nil {
             do {
-                let response = try await session.translate(TextNormalizer.translationInput(source))
+                let response = try await session.translate(text)
                 deliver(source, response.targetText)
             } catch {
                 if Task.isCancelled { return }

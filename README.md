@@ -15,6 +15,7 @@ Point your iPhone at an Italian menu or sign and read it in English. Traduci ope
 
 - **Fully offline.** Apple's Vision reads the text and Apple's Translation framework translates it, both on the device. After a one-time download of the Italian language pack, it works in airplane mode.
 - **Built for speed.** OCR always runs on the newest camera frame and never works through a backlog. While you aim, the text nearest the centre is translated ahead, so most of the page is already in English when the picture is taken. Every result is cached, and the translation model is loaded before the first text shows up.
+- **Knows Italian dishes.** Named dishes, course headings and kitchen words the translator gets wrong ("Ribollita" is not "Boiled") come from a glossary; [a benchmark](docs/translation-benchmark.md) of the translators that fit on an iPhone keeps Apple's.
 - **Reads menus like a diner.** It works out which lines are one dish, which are its ingredients and allergens, which price goes with it (in a price column, under a centred dish, or at the end of the ingredients), where the sections start, and which way the columns go. English that the menu already prints is left alone.
 - **Stays put.** The picture stays until you tap **Scan**: put the phone down, pass it across the table, it's still there.
 

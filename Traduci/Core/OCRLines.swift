@@ -37,11 +37,18 @@ enum OCRTiles {
         var kept: [OCRLine] = []
         for reading in readings {
             for line in reading {
-                if let index = kept.firstIndex(where: { sameSpot($0, line) }) {
-                    if better(line, than: kept[index]) { kept[index] = line }
-                } else {
+                // A whole line can cover several pieces of it read before ("…la tradizione toscana" and
+                // "con uno sguardo"): the best reading takes the first one's place, the rest go.
+                let matches = kept.indices.filter { sameSpot(kept[$0], line) }
+                guard let first = matches.first else {
                     kept.append(line)
+                    continue
                 }
+                var winner = kept[first]
+                for index in matches.dropFirst() where better(kept[index], than: winner) { winner = kept[index] }
+                if better(line, than: winner) { winner = line }
+                kept[first] = winner
+                for index in matches.dropFirst().reversed() { kept.remove(at: index) }
             }
         }
         return kept

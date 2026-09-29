@@ -1,0 +1,7 @@
+# The translation benchmark (Tests/Lab/Benchmark), on an Apple silicon Mac.
+mlx-lm==0.31.3
+mlx-vlm==0.7.4
+transformers
+sentencepiece
+torch
+httpx

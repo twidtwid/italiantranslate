@@ -216,7 +216,9 @@ enum MenuReader {
         var rows: [Row]
         var foreign: [Row] = []
         var price: String?
-        var priceBox: CGRect?
+        /// The price's own line, when it has one (a price column, under the dish).
+        var priceRow: Row?
+        var priceBox: CGRect? { priceRow?.box }
         /// Already in another language, with nothing Italian above it: a name, or an English notice.
         let isForeign: Bool
         /// The last line taken in any language: the next line must sit right under it.
@@ -331,7 +333,9 @@ enum MenuReader {
     // MARK: - Prices
 
     /// Price lines go with the dish on the same printed row (a price column), or else with the dish
-    /// right above them (centred menus print the price on the line under the dish).
+    /// right above them (centred menus print the price on the line under the dish). A price with a
+    /// currency or cents takes over from a bare number found first: "1, 7" under a dish is its
+    /// allergens, and "€16.00" under that is its price.
     static func attach(_ prices: [Row], to groups: [Group]) {
         for price in prices.sorted(by: { $0.top < $1.top }) {
             var target: Group?
@@ -351,7 +355,7 @@ enum MenuReader {
                 for group in groups where !group.isForeign {
                     // Under the dish, or inside it: a line of its own between description and allergens.
                     let inside = price.top > group.top && price.bottom < group.bottom
-                    let gap = inside ? 0 : price.top - group.bottom
+                    let gap = inside ? 0 : price.top - max(group.bottom, group.priceRow?.bottom ?? 0)
                     guard gap >= -0.5 * price.height, gap < 1.6 * price.height,
                           price.centerX >= group.left - 0.02, price.centerX <= group.right + 0.02,
                           gap < best else { continue }
@@ -359,9 +363,11 @@ enum MenuReader {
                     best = gap
                 }
             }
-            if let target, target.price == nil {
+            guard let target else { continue }
+            let takesOver = target.price.map { !Price.isMarked($0) && Price.isMarked(price.text) } ?? true
+            if takesOver {
                 target.price = price.text
-                target.priceBox = price.box
+                target.priceRow = price
             }
         }
     }
