@@ -67,7 +67,10 @@ enum MenuReader {
             row.ownPrice = price
             row.language = language(text)
             if let price, Price.isMarked(price) { markedPrices += 1 }
-            if TextNormalizer.isWorthTranslating(text) { texts.append(row) }
+            // Hours are mostly digits, but "Sabato: 18,30 - 02,00" is worth reading.
+            if TextNormalizer.isWorthTranslating(text) || (Price.hasTimes(text) && text.filter(\.isLetter).count >= 3) {
+                texts.append(row)
+            }
         }
         texts.sort { ($0.top, $0.left) < ($1.top, $1.left) }
         let italianHeights = texts.filter { $0.language != .foreign }.map(\.height).sorted()
@@ -427,7 +430,8 @@ enum MenuReader {
                 details = [rest]
             }
         }
-        guard title.filter(\.isLetter).count >= (group.price == nil ? 4 : 2) else { return nil } // stray glyphs
+        // Stray glyphs, unless it's a word the glossary knows ("ZTL").
+        guard title.filter(\.isLetter).count >= (group.price == nil ? 4 : 2) || Glossary.knows(title) else { return nil }
         let kind: MenuEntry.Kind
         if group.price != nil, !group.isForeign {
             kind = .item
@@ -531,6 +535,9 @@ enum Price {
         options: [.caseInsensitive]
     )
     private static let marked = try! NSRegularExpression(pattern: #"€|\beur|\d[.,]\d{2}\b"#, options: [.caseInsensitive])
+    /// Opening hours and the hours a sign applies ("19,30 - 02,00", "8.00-20.00"): times, not prices.
+    private static let timeRange = try! NSRegularExpression(
+        pattern: #"\b(?:[01]?\d|2[0-4])[.,:][0-5]\d\s*[-–—÷]\s*(?:[01]?\d|2[0-4])[.,:][0-5]\d\b"#)
 
     /// The whole line is a price ("€ 12", "EURO 18", "11,00", "C18" for a misread "€18").
     static func isWholeLine(_ text: String) -> Bool {
@@ -545,7 +552,15 @@ enum Price {
 
     /// "Dolce del giorno € 6.00" → ("Dolce del giorno", "€ 6.00"); no price → (text, nil).
     /// Without `bareNumbers`, "fragole 13" keeps its number: only a marked price comes off.
+    /// Hours in it: "19,30 - 02,00", "8.00-20.00".
+    static func hasTimes(_ text: String) -> Bool {
+        timeRange.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
     static func split(_ text: String, bareNumbers: Bool = true) -> (text: String, price: String?) {
+        if hasTimes(text), !text.contains("€"), !text.lowercased().contains("eur") {
+            return (text, nil) // "da Lunedì al Venerdì: 19,30 - 02,00" is when, not how much
+        }
         let pattern = bareNumbers ? trailing : trailingMarked
         guard let match = pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
               let textRange = Range(match.range(at: 1), in: text),

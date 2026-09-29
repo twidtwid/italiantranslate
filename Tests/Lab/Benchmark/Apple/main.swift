@@ -12,11 +12,11 @@ for glossary in [false, true] {
     for row in rows {
         let text = row["text"] as! String
         let started = Date()
-        if glossary, case .known(let english) = DishGlossary.prepare(text) {
+        if glossary, case .known(let english) = Glossary.prepare(text) {
             out[text] = english
         } else {
             var input = TextNormalizer.translationInput(text)
-            if glossary, case .translate(let rewritten) = DishGlossary.prepare(text) { input = rewritten }
+            if glossary, case .translate(let rewritten) = Glossary.prepare(text) { input = rewritten }
             out[text] = (try? await session.translate(input).targetText) ?? "(failed)"
         }
         times.append(Date().timeIntervalSince(started) * 1000)

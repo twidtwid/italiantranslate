@@ -58,7 +58,7 @@ recipes and made things up ("Battuta di fassona", raw beef, became a slow-cooked
   "Boiled", "Fagioli all'uccelletto" → "Bird beans", "Secondi" → "Seconds", "Coperto" → "Covered".
   The open models have the same problem in other forms ("Peposo" → "Pork", "nocciole" →
   "walnuts", "Pere e pecorino" → "Goats and goat cheese").
-- **The glossary** (`Traduci/Core/DishGlossary.swift`) fixes those where it knows the words: 74 →
+- **The glossary** (`Traduci/Core/Glossary.swift`) fixes those where it knows the words: 74 →
   82 on the lab's menus, with misleading English halved. On new menus it moves the score only as
   far as it covers their words (76 → 77, touching 8 of 196 lines). It grows by adding the words new
   menus show; every addition gets a test.

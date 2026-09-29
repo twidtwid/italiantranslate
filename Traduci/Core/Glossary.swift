@@ -1,11 +1,12 @@
 import Foundation
 
-/// Italian dishes and kitchen words that on-device translation gets wrong ("Ribollita" → "Boiled",
-/// "Fagioli all'uccelletto" → "Bird beans", "Peposo" → "Pepperoni"). A dish known by name is
-/// described in English without the translator; a line that only contains such a word gets it
-/// spelled out in plain Italian first, which the translator reads well. The Italian name is still
-/// shown under the English, to order by.
-enum DishGlossary {
+/// Italian that on-device translation gets wrong: dishes and kitchen words ("Ribollita" → "Boiled",
+/// "Fagioli all'uccelletto" → "Bird beans"), the menu's own words ("Coperto" → "Covered"), and the
+/// signs a visitor must not misread ("Varco attivo" → "Active sling", where it means a camera will
+/// fine you for driving in). Known by name, the English comes from here; a line that only contains
+/// such a word gets it spelled out in plain Italian first, which the translator reads well. The
+/// Italian is still shown under the English, to order by or match the sign.
+enum Glossary {
     enum Prepared: Equatable {
         /// A dish known by name: this is its English.
         case known(String)
@@ -16,8 +17,14 @@ enum DishGlossary {
     /// What to do with `source` (as OCR read it): its English, or the text to translate.
     static func prepare(_ source: String) -> Prepared {
         let key = key(source)
-        if let english = courses[key] ?? dishes[key] ?? course(misread: key) { return .known(english) }
+        if let english = courses[key] ?? signs[key] ?? dishes[key] ?? course(misread: key) { return .known(english) }
         return .translate(rewrite(TextNormalizer.translationInput(source)))
+    }
+
+    /// Known by name, however short: "ZTL" is three letters and the most expensive sign in Italy.
+    static func knows(_ text: String) -> Bool {
+        let key = key(text)
+        return courses[key] != nil || signs[key] != nil || dishes[key] != nil
     }
 
     /// A course heading OCR got a letter or two wrong ("Primi Pialli", "Secondi Pialli"). Headings
@@ -76,6 +83,68 @@ enum DishGlossary {
         "vini bianchi": "White wines", "birre": "Beers", "aperitivi": "Aperitifs", "digestivi": "Digestifs",
         "amari": "Digestifs", "caffetteria": "Coffee",
         "coperto": "Cover charge", "coperto e servizio": "Cover and service charge",
+    ]
+
+    /// Street, station and shop signs, by their words (keys as `key` makes them). Driving into a ZTL
+    /// while its camera is on ("varco attivo") costs a fine every time; "feriali" includes Saturday.
+    static let signs: [String: String] = [
+        // Limited traffic zones
+        "ztl": "Limited traffic zone (ZTL): no driving in without a permit",
+        "zona a traffico limitato": "Limited traffic zone (ZTL): no driving in without a permit",
+        "zona traffico limitato": "Limited traffic zone (ZTL): no driving in without a permit",
+        "traffico limitato": "Limited traffic zone (ZTL): no driving in without a permit",
+        "varco attivo": "ZTL camera ON: do not drive in",
+        "varco ztl attivo": "ZTL camera ON: do not drive in",
+        "ztl varco attivo": "ZTL camera ON: do not drive in",
+        "ztl attiva": "ZTL camera ON: do not drive in",
+        "varco non attivo": "ZTL camera off: you may drive in",
+        "varco ztl non attivo": "ZTL camera off: you may drive in",
+        "ztl varco non attivo": "ZTL camera off: you may drive in",
+        "ztl non attiva": "ZTL camera off: you may drive in",
+        "varco elettronico": "Camera-checked entry (ZTL)",
+        "controllo elettronico degli accessi": "Entry checked by camera",
+        "eccetto autorizzati": "Except vehicles with a permit",
+        "eccetto veicoli autorizzati": "Except vehicles with a permit",
+        // Driving and parking
+        "senso vietato": "No entry (one-way street)",
+        "divieto di accesso": "No entry",
+        "divieto di transito": "No vehicles",
+        "divieto di sosta": "No parking",
+        "divieto di fermata": "No stopping",
+        "zona rimozione": "Tow-away zone",
+        "rimozione forzata": "Illegally parked cars will be towed",
+        "passo carrabile": "Driveway: no parking",
+        "sosta consentita": "Parking allowed",
+        "disco orario": "Parking disc required: show your arrival time",
+        "zona disco": "Parking disc required: show your arrival time",
+        "giorni feriali": "Monday to Saturday",
+        "feriali": "Monday to Saturday",
+        "giorni festivi": "Sundays and public holidays",
+        "festivi": "Sundays and public holidays",
+        "lavori in corso": "Roadworks",
+        "deviazione": "Diversion",
+        "rallentare": "Slow down",
+        "tangenziale": "Ring road",
+        "solo telepass": "Telepass lane only: electronic toll tag, no cash or cards",
+        "telepass": "Telepass lane: electronic toll tag only",
+        // Stations, shops and beaches
+        "obliterare il biglietto": "Validate your ticket",
+        "convalidare il biglietto": "Validate your ticket",
+        "binario": "Platform",
+        "bagni": "Toilets",
+        "servizi": "Toilets",
+        "servizi igienici": "Toilets",
+        "spingere": "Push",
+        "tirare": "Pull",
+        "guasto": "Out of order",
+        "tabacchi": "Tobacconist (bus tickets, stamps)",
+        "farmacia di turno": "Pharmacy open out of hours",
+        "orario continuato": "Open all day, no lunch break",
+        "vietato l'accesso ai non addetti ai lavori": "Authorised personnel only",
+        "vietato l'ingresso ai non addetti ai lavori": "Authorised personnel only",
+        "stabilimento balneare": "Beach club (paid entry)",
+        "spiaggia libera": "Public beach (free)",
+        "divieto di balneazione": "No swimming",
     ]
 
     /// Dishes by name (keys as `key` makes them). The English says what it is, briefly.
@@ -165,6 +234,8 @@ enum DishGlossary {
     /// Words inside a line, spelled out in plain Italian before translation. Longer patterns come
     /// first, so "pici cacio e pepe" is handled before "cacio e pepe".
     static let terms: [(pattern: String, plain: String)] = [
+        ("obliterare", "convalidare"), // "Obliterate the ticket"
+        ("obliterate", "convalidate"),
         // Phrases that contain a shorter entry below come first.
         ("schiacciata alla fiorentina", "torta soffice all'arancia"),
         ("cacciucco alla livornese", "zuppa di pesce alla livornese"),

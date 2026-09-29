@@ -21,7 +21,7 @@ phone (Vision OCR, Apple Translation). README.md explains the app; CONTRIBUTING.
 - `Traduci/*.swift` — camera, Vision, translation queue, the SwiftUI screens, `AppModel` (the
   point-hold-read state machine, and `Demo` launch-argument mode for the Simulator).
 - `Tests/CoreTests/` — plain-`swiftc` tests; `Fixtures/` is real OCR of real menus from the lab.
-- `Traduci/Core/DishGlossary.swift` — dishes, course headings and kitchen words the translator gets
+- `Traduci/Core/Glossary.swift` — dishes, course headings, kitchen words and street signs the translator gets
   wrong. Add what new menus show, each with a test; measure with `Tests/Lab/Benchmark`
   (`docs/translation-benchmark.md`), judging on menus the glossary hasn't seen.
 - `Tests/Lab/` — real menus to camera-like frames (`fixtures.py`), read by the app's own OCR

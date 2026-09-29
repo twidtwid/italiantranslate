@@ -135,7 +135,7 @@ final class TranslationEngine {
         // Dishes known by name need no translator; the rest go with their kitchen words spelled out.
         var inputs: [(source: String, text: String)] = []
         for source in batch {
-            switch DishGlossary.prepare(source) {
+            switch Glossary.prepare(source) {
             case .known(let english): deliver(source, english)
             case .translate(let text): inputs.append((source, text))
             }

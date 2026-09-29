@@ -2,6 +2,20 @@
 
 Builds ship through TestFlight; the build number is the number of the workflow run that uploaded it.
 
+## Build 23.1 — 29 September 2026
+
+**Street signs, and more Italian dishes.**
+
+- **ZTL signs:** "ZTL" came out unchanged and "Varco attivo" as "Active sling"; now they say it's a
+  limited traffic zone, and whether its camera is on (don't drive in: a fine each time). "ZTL" was
+  also too short to be read at all. Signs for no entry, towing, parking discs, tolls ("Solo
+  Telepass"), tickets to validate, platforms, toilets and beaches read right too, and "feriali" says
+  Monday to Saturday.
+- **Hours aren't prices:** a sign's "19,30 - 02,00" was listed at €02.00.
+- **More dishes the translator didn't know:** common Tuscan and Roman dishes and menu words
+  ("Coda di rospo" was "Toad", "Prosciutto crudo" "Raw ham", "Linguine allo scoglio" "Linguine with
+  rock"). On four menus it had never seen, the lines it changes went from 42 to 84 out of 100.
+
 ## Build 22.1 — 28 September 2026
 
 **The right price, and dishes by their real names.**
