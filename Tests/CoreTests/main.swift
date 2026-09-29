@@ -430,24 +430,47 @@ do {
 
 do {
     // What Apple's translator made of these on the lab's menus: "Boiled", "Bird beans", "Florentine pepperoni".
-    expect(DishGlossary.prepare("-Ribollita") == .known("Tuscan bread, bean and cabbage soup"), "a dish known by name, list marker and all")
-    expect(DishGlossary.prepare("FAGIOLI ALL’UCCELLETTO *") == .known("Beans stewed with tomato and sage"), "capitals, curly apostrophe, footnote star")
-    expect(DishGlossary.prepare("Carciofi trifolati") == .translate("Carciofi saltati in padella con aglio e prezzemolo"),
-           "a kitchen word spelled out in plain Italian: \(DishGlossary.prepare("Carciofi trifolati"))")
-    expect(DishGlossary.rewrite("Zeppole di San Giuseppe") == "Frittelle di San Giuseppe", "capitalised at the start of the line")
-    expect(DishGlossary.rewrite("Piccione arrosto") == "Piccione arrosto", "a word that starts like one (pici) is left alone")
-    expect(DishGlossary.prepare("Guancia di maiale") == .translate("Guancia di maiale"), "everything else goes to the translator as it is")
+    expect(Glossary.prepare("-Ribollita") == .known("Tuscan bread, bean and cabbage soup"), "a dish known by name, list marker and all")
+    expect(Glossary.prepare("FAGIOLI ALL’UCCELLETTO *") == .known("Beans stewed with tomato and sage"), "capitals, curly apostrophe, footnote star")
+    expect(Glossary.prepare("Carciofi trifolati") == .translate("Carciofi saltati in padella con aglio e prezzemolo"),
+           "a kitchen word spelled out in plain Italian: \(Glossary.prepare("Carciofi trifolati"))")
+    expect(Glossary.rewrite("Zeppole di San Giuseppe") == "Frittelle di San Giuseppe", "capitalised at the start of the line")
+    expect(Glossary.rewrite("Piccione arrosto") == "Piccione arrosto", "a word that starts like one (pici) is left alone")
+    expect(Glossary.prepare("Guancia di maiale") == .translate("Guancia di maiale"), "everything else goes to the translator as it is")
     // The menu's own words, which the translator reads as ordinary ones ("Seconds", "Contorns", "Covered").
-    expect(DishGlossary.prepare("SECONDI PIATTI •") == .known("Main courses") && DishGlossary.prepare("Contorni") == .known("Side dishes"),
+    expect(Glossary.prepare("SECONDI PIATTI •") == .known("Main courses") && Glossary.prepare("Contorni") == .known("Side dishes"),
            "course headings")
-    expect(DishGlossary.prepare("Coperto") == .known("Cover charge"), "the cover charge")
-    expect(DishGlossary.rewrite("Gelato coperto di cioccolato") == "Gelato coperto di cioccolato", "coperto inside a line is just \"covered\"")
-    expect(DishGlossary.prepare("Secondi Pialli") == .known("Main courses") && DishGlossary.prepare("Primi Pialli") == .known("First courses"),
+    expect(Glossary.prepare("Coperto") == .known("Cover charge"), "the cover charge")
+    expect(Glossary.rewrite("Gelato coperto di cioccolato") == "Gelato coperto di cioccolato", "coperto inside a line is just \"covered\"")
+    expect(Glossary.prepare("Secondi Pialli") == .known("Main courses") && Glossary.prepare("Primi Pialli") == .known("First courses"),
            "a heading OCR misread")
-    expect(DishGlossary.prepare("Secondi di pesce") == .translate("Secondi di pesce"), "but not a different heading")
-    expect(DishGlossary.prepare("Con un primo piatto") == .translate("Con un primo piatto"), "or a line that says more than the heading")
-    expect(DishGlossary.rewrite("Fettuccine speck e finferli") == "Fettuccine speck e chanterelle", "an English name passes through the translator")
-    expect(DishGlossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
+    expect(Glossary.prepare("Secondi di pesce") == .translate("Secondi di pesce"), "but not a different heading")
+    expect(Glossary.prepare("Con un primo piatto") == .translate("Con un primo piatto"), "or a line that says more than the heading")
+    expect(Glossary.rewrite("Fettuccine speck e finferli") == "Fettuccine speck e chanterelle", "an English name passes through the translator")
+    // Roman and Tuscan words the translator made into "Toad", "Silly bread" and "Linguine with rock".
+    expect(Glossary.rewrite("Coda di rospo al forno") == "Rana pescatrice al forno", "monkfish")
+    expect(Glossary.rewrite("Linguine allo scoglio") == "Linguine ai frutti di mare", "seafood")
+    expect(Glossary.rewrite("Cacciucco alla livornese") == "Zuppa di pesce alla livornese", "a phrase before the word it contains")
+
+    // Signs: "Varco attivo" read as "Active sling", where it means a camera fines you for driving in.
+    expect(Glossary.prepare("VARCO ATTIVO") == .known("ZTL camera ON: do not drive in"), "the ZTL camera is on")
+    expect(Glossary.prepare("Varco non attivo") == .known("ZTL camera off: you may drive in"), "and off")
+    expect(Glossary.prepare("Giorni feriali") == .known("Monday to Saturday"), "feriali includes Saturday")
+    let ztl = MenuReader.entries(from: [
+        OCRLine(text: "ZTL", box: CGRect(x: 0.35, y: 0.3, width: 0.3, height: 0.08)),
+        OCRLine(text: "VARCO ATTIVO", box: CGRect(x: 0.2, y: 0.6, width: 0.6, height: 0.05)),
+    ])
+    expect(ztl.map(\.title) == ["ZTL", "VARCO ATTIVO"], "three letters, but the most expensive sign in Italy: \(ztl.map(\.title))")
+    // The hours a ZTL sign applies are times, not prices (a sign in Lucera read as "€02.00").
+    expect(Price.split("da Lunedi al Venerdi: 19,30 - 02,00").price == nil, "a time range isn't a price")
+    expect(Price.split("Menu del pranzo 12.00-15.00 € 15").price == "€ 15", "a price after the hours still is")
+    let hours = MenuReader.entries(from: [
+        OCRLine(text: "da Lunedi al Venerdi: 19,30 - 02,00", box: CGRect(x: 0.13, y: 0.53, width: 0.70, height: 0.04)),
+        OCRLine(text: "Sabato: 18,30 - 02,00", box: CGRect(x: 0.27, y: 0.60, width: 0.43, height: 0.03)),
+    ])
+    expect(hours.map(\.title) == ["da Lunedi al Venerdi: 19,30 - 02,00", "Sabato: 18,30 - 02,00"] && hours.allSatisfy { $0.price == nil },
+           "each line of hours kept, none of them priced: \(hours.map(\.title))")
+    expect(Glossary.rewrite("Semifreddo, ganache al fondente") == "Semifreddo, ganache al cioccolato fondente", "a phrase, not only a word")
 }
 
 // MARK: Captions

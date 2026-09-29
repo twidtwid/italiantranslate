@@ -15,6 +15,12 @@
    "about": "Modern menu, allergen numbers"},
   {"name": "indigo", "url": "https://digital.ihg.com/is/content/ihg/hotel-indigo-florence-10799815456-original?fmt=pdf",
    "about": "Hotel restaurant in Florence, bilingual sections"},
+  {"name": "santilario", "url": "https://ristorante-menu.anvil.app/_/theme/italiano.pdf", "pages": [1],
+   "about": "Tuscan trattoria: centred dishes, allergen numbers on a line of their own, then the price"},
+  {"name": "ztl-lucera", "url": "https://upload.wikimedia.org/wikipedia/commons/c/c6/Cartello_Zona_Traffico_Limitato_Via_Gramsci_Lucera.jpg", "photo": true,
+   "about": "A ZTL sign with its hours (times, not prices). Photo: Armando Verducci, Wikimedia Commons, CC BY-SA 3.0"},
+  {"name": "ztl-palermo", "url": "https://upload.wikimedia.org/wikipedia/commons/6/65/Cartello_ZTL_Palermo.jpg", "photo": true,
+   "about": "A ZTL sign in Palermo, the zone's name split over two lines. Photo: Kar.ma, Wikimedia Commons, CC BY-SA 3.0"},
   {"name": "plaque", "file": "Tests/Lab/plaque.png",
    "about": "From a TestFlight report: a winery plaque, paragraphs of prose in light letters on corten steel"}
 ]

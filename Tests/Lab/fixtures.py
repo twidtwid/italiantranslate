@@ -51,6 +51,11 @@ def load_pages(entry, root):
     else:
         request = urllib.request.Request(entry["url"], headers={"User-Agent": "Mozilla/5.0 (Macintosh) Traduci-lab"})
         data = urllib.request.urlopen(request, timeout=60).read()
+        if not data.startswith(b"%PDF"):  # a photo (a street sign)
+            image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+            if image is None:
+                raise RuntimeError(f"can't read {entry['url']}")
+            return [image]
     document = pymupdf.open(stream=data, filetype="pdf")
     pages = []
     for index in entry.get("pages", [0]):
@@ -125,7 +130,9 @@ def main():
     made = []
     for entry in json.loads(manifest.read_text()):
         try:
-            pages = [half for page in load_pages(entry, root) for half in halves(page)]
+            pages = load_pages(entry, root)
+            if not entry.get("photo"):  # a photo is one scene, not two menu pages side by side
+                pages = [half for page in pages for half in halves(page)]
         except Exception as error:  # a menu that moved or vanished shouldn't sink the others
             print(f"skip {entry['name']}: {error}")
             continue

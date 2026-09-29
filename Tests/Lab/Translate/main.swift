@@ -48,7 +48,7 @@ var milliseconds: [Double] = []
     if let known = cache[text] { return known }
     let started = Date()
     let result: String
-    switch DishGlossary.prepare(text) { // as the app does it
+    switch Glossary.prepare(text) { // as the app does it
     case .known(let english): result = english
     case .translate(let input): result = (try? await session.translate(input).targetText) ?? "(failed)"
     }
