@@ -39,7 +39,7 @@ points at the Command Line Tools.
 xcrun swiftc -O Traduci/Core/*.swift Tests/CoreTests/main.swift -o "$TMPDIR/core-tests" && "$TMPDIR/core-tests"
 
 # Menu lab: frames, then the app's OCR and menu reader on them (summary.md + annotated frames)
-python3 -m venv .venv && .venv/bin/pip install -r Tests/Lab/requirements.txt
+~/.local/bin/uv venv .venv && ~/.local/bin/uv pip install --python .venv/bin/python -r Tests/Lab/requirements.txt
 .venv/bin/python Tests/Lab/fixtures.py Tests/Lab/menus.json "$TMPDIR/lab/frames"
 xcrun swiftc -O Traduci/Core/*.swift Traduci/TextRecognizer.swift Tests/Lab/Common.swift Tests/Lab/main.swift -o "$TMPDIR/lab/lab"
 "$TMPDIR/lab/lab" "$TMPDIR/lab/frames" "$TMPDIR/lab/out"
